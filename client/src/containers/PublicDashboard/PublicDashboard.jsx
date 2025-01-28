@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
-import { Link as LinkDom, useParams } from "react-router-dom";
+import { Link as LinkDom, useParams, useSearchParams } from "react-router-dom";
 import {
   Button, Input, Spacer, Navbar, Tooltip, Popover, Divider, Modal,
-  Link, Image, CircularProgress, NavbarContent, PopoverTrigger, PopoverContent, ModalContent, ModalHeader, ModalBody, ModalFooter, Chip, NavbarItem, NavbarBrand,
-} from "@nextui-org/react";
+  Link, Image, CircularProgress, PopoverTrigger, PopoverContent, ModalContent, ModalHeader, ModalBody, ModalFooter, Chip, NavbarBrand,
+} from "@heroui/react";
 import { connect, useDispatch, useSelector } from "react-redux";
 import { TwitterPicker } from "react-color";
 import { Helmet } from "react-helmet";
 import { clone } from "lodash";
 import { useDropzone } from "react-dropzone";
-import { ToastContainer, toast, Flip } from "react-toastify";
-import "react-toastify/dist/ReactToastify.min.css";
+import toast from "react-hot-toast";
 import {
-  LuArrowLeftSquare,
-  LuCheckCircle, LuChevronLeft, LuClipboardEdit, LuEye, LuImagePlus, LuPalette,
-  LuRefreshCw, LuShare, LuXCircle,
+  LuSquareArrowLeft,
+  LuCircleCheck, LuChevronLeft, LuEye, LuImagePlus, LuPalette,
+  LuRefreshCw, LuShare, LuCircleX,
+  LuClipboardPen,
 } from "react-icons/lu";
 import { WidthProvider, Responsive } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -29,19 +29,19 @@ import "ace-builds/src-min-noconflict/theme-one_dark";
 import {
   getPublicDashboard, getProject, updateProject, updateProjectLogo,
 } from "../../slices/project";
-import { selectTeams, updateTeam } from "../../slices/team";
-import { runQueryOnPublic, selectCharts } from "../../slices/chart";
+import { selectTeams } from "../../slices/team";
+import { runQueryOnPublic, runQueryWithFilters, selectCharts } from "../../slices/chart";
 import { blue, primary, secondary } from "../../config/colors";
 import Chart from "../Chart/Chart";
 import logo from "../../assets/logo_inverted.png";
-import { API_HOST, SITE_HOST } from "../../config/settings";
+import { API_HOST } from "../../config/settings";
 import canAccess from "../../config/canAccess";
 import SharingSettings from "./components/SharingSettings";
 import instructionDashboard from "../../assets/instruction-dashboard-report.png";
 import Text from "../../components/Text";
 import Row from "../../components/Row";
 import Container from "../../components/Container";
-import useThemeDetector from "../../modules/useThemeDetector";
+import { useTheme } from "../../modules/ThemeContext";
 
 const ResponsiveGridLayout = WidthProvider(Responsive, { measureBeforeMount: true });
 
@@ -65,7 +65,6 @@ function PublicDashboard(props) {
   });
   const [logoPreview, setLogoPreview] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [error, setError] = useState("");
   const [noCharts, setNoCharts] = useState(false);
   const [preview, setPreview] = useState(false);
   const [passwordRequired, setPasswordRequired] = useState(false);
@@ -78,7 +77,8 @@ function PublicDashboard(props) {
   const teams = useSelector(selectTeams);
   const charts = useSelector(selectCharts);
 
-  const isDark = useThemeDetector();
+  const [searchParams] = useSearchParams();
+  const { setTheme, isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
   const initLayoutRef = useRef(null);
@@ -103,6 +103,12 @@ function PublicDashboard(props) {
   useEffect(() => {
     setLoading(true);
     _fetchProject(window.localStorage.getItem("reportPassword"));
+
+    if (searchParams.get("theme") === "light" || searchParams.get("theme") === "dark") {
+      setTheme(searchParams.get("theme"));
+    } else {
+      setTheme("system");
+    }
   }, []);
 
   useEffect(() => {
@@ -157,6 +163,13 @@ function PublicDashboard(props) {
     }
   }, [charts]);
 
+  useEffect(() => {
+    if (project?.id) {
+      _checkSearchParamsForFilters();
+      _checkSearchParamsForFields();
+    }
+  }, [project]);
+
   const _fetchProject = (password) => {
     if (password) window.localStorage.setItem("reportPassword", password);
 
@@ -187,12 +200,8 @@ function PublicDashboard(props) {
           dispatch(getProject({ project_id: data.payload?.id }))
             .then((projectData) => {
               if (!projectData.payload) throw new Error(404);
-              const authenticatedProject = projectData.payload;
 
-              if (authenticatedProject.password) {
-                setProject({ ...data.payload, password: authenticatedProject.password });
-              }
-
+              setProject({ ...projectData.payload });
               setEditorVisible(true);
             })
             .catch(() => {});
@@ -200,30 +209,102 @@ function PublicDashboard(props) {
       });
   };
 
-  const _isOnReport = () => {
-    return charts.filter((c) => c.onReport).length > 0;
+  const _checkSearchParamsForFilters = () => {
+    charts.forEach((chart) => {
+      // check if there are any filters in the search params
+      // if so, add them to the conditions
+      const params = [];
+      if (searchParams?.entries) {
+        // Convert searchParams to array and filter out empty entries
+        const searchParamsArray = Array.from(searchParams.entries());
+        if (searchParamsArray.length > 0) {
+          searchParamsArray.forEach(([key, value]) => {
+            params.push({ variable: key, value });
+          });
+        }
+      }
+
+      if (params.length === 0) return;
+
+      let identifiedConditions = [];
+      chart.ChartDatasetConfigs.forEach((cdc) => {
+        if (Array.isArray(cdc.Dataset?.conditions)) {
+          identifiedConditions = [...identifiedConditions, ...cdc.Dataset.conditions];
+        }
+      });
+
+      // now check if any filters have the same variable name
+      let newConditions = [];
+      newConditions = identifiedConditions.map((c) => {
+        const newCondition = { ...c };
+        const param = params.find((p) => p.variable === c.variable);
+        if (param) {
+          newCondition.value = param.value;
+        }
+        return newCondition;
+      });
+
+      // remove conditions that don't have a value
+      newConditions = newConditions.filter((c) => c.value);
+
+      if (newConditions.length === 0) return;
+
+      dispatch(runQueryWithFilters({ project_id: chart.project_id, chart_id: chart.id, filters: newConditions }))
+    });
   };
 
-  const _onSaveBrewName = (newBrewName) => {
-    if (!newBrewName) return;
+  const _checkSearchParamsForFields = () => {
+    if (!searchParams || !searchParams.entries || searchParams.entries()?.length === 0) return;
 
-    if (newBrewName.indexOf("/") > -1) {
-      setError("The route contains invalid characters. Try removing the '/'");
-      return;
+    const filters = [];
+    searchParams.entries().forEach((entry) => {
+      const [key, value] = entry;
+      if (key.startsWith("fields[")) {
+        let field = key.replace("fields[", "");
+        field = field.substring(0, field.length - 1);
+        if (!field.includes("root[].")) {
+          field = `root[].${field}`;
+        }
+
+        filters.push({ field, value, operator: "is", project_id: project.id });
+      }
+    });
+
+    const refreshPromises = [];
+    charts.forEach((chart) => {
+      if (_chartHasFilter(chart, filters)) {
+        refreshPromises.push(
+          dispatch(runQueryWithFilters({
+            project_id: project.id,
+            chart_id: chart.id,
+            filters
+          }))
+        );
+      }
+    });
+
+    return Promise.all(refreshPromises);
+  };
+
+  const _chartHasFilter = (chart, filters) => {
+    let found = false;
+    if (chart.ChartDatasetConfigs) {
+      chart.ChartDatasetConfigs.forEach((cdc) => {
+        if (cdc.Dataset?.fieldsSchema) {
+          Object.keys(cdc.Dataset.fieldsSchema).forEach((key) => {
+            if (filters && filters.some(o => o.field === key || `root[].${o.field}` === key || `root.${o.field}` === key)) {
+              found = true;
+            }
+          });
+        }
+      });
     }
 
-    setSaveLoading(true);
-    const processedName = encodeURI(newBrewName);
-    dispatch(updateProject({ project_id: project.id, data: { brewName: processedName } }))
-      .then((project) => {
-        setSaveLoading(false);
-        setIsSaved(true);
-        window.location.href = `${SITE_HOST}/b/${project.payload.brewName}`;
-      })
-      .catch(() => {
-        setSaveLoading(false);
-        setError("This dashboard URL is already taken. Please try another one.");
-      });
+    return found;
+  };
+
+  const _isOnReport = () => {
+    return charts.filter((c) => c.onReport).length > 0;
   };
 
   const _onSaveChanges = () => {
@@ -245,42 +326,6 @@ function PublicDashboard(props) {
       .catch(() => {
         toast.error("Oh no! We couldn't update the dashboard. Please try again");
       });
-  };
-
-  const _onTogglePublic = (value) => {
-    dispatch(updateProject({ project_id: project.id, data: { public: value } }))
-      .then(() => {
-        _fetchProject();
-        toast.success("The report has been updated!");
-      })
-      .catch(() => { });
-  };
-
-  const _onTogglePassword = (value) => {
-    dispatch(updateProject({ project_id: project.id, data: { passwordProtected: value } }))
-      .then(() => {
-        _fetchProject();
-        toast.success("The report has been updated!");
-      })
-      .catch(() => { });
-  };
-
-  const _onSavePassword = (value) => {
-    dispatch(updateProject({ project_id: project.id, data: { password: value } }))
-      .then(() => {
-        _fetchProject();
-        toast.success("The report has been updated!");
-      })
-      .catch(() => { });
-  };
-
-  const _onToggleBranding = () => {
-    dispatch(updateTeam({ team_id: project.team_id, data: { showBranding: !project.Team.showBranding } }))
-      .then(() => {
-        _fetchProject();
-        toast.success("The branding settings are saved!");
-      })
-      .catch(() => {});
   };
 
   const _onRefreshCharts = () => {
@@ -388,20 +433,6 @@ function PublicDashboard(props) {
             </Row>
           </div>
         )}
-
-        <ToastContainer
-          position="bottom-center"
-          autoClose={1500}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnVisibilityChange
-          draggable
-          pauseOnHover
-          transition={Flip}
-          theme={isDark ? "dark" : "light"}
-        />
       </div>
     );
   }
@@ -482,7 +513,7 @@ function PublicDashboard(props) {
                 <Tooltip content="Back to your dashboard" placement="right-end">
                   <LinkDom to={`/${project.team_id}/${project.id}/dashboard`}>
                     <Link className="text-foreground cursor-pointer">
-                      <LuArrowLeftSquare size={26} />
+                      <LuSquareArrowLeft size={26} />
                     </Link>
                   </LinkDom>
                 </Tooltip>
@@ -498,7 +529,7 @@ function PublicDashboard(props) {
                 </Tooltip>
               </div>
 
-              {project?.id && _canAccess("projectAdmin") && (
+              {project?.id && _canAccess("projectEditor") && (
                 <>
                   <div>
                     <Tooltip content="Change logo" placement="right-end">
@@ -564,7 +595,7 @@ function PublicDashboard(props) {
                   <div>
                     <Tooltip content="Report settings" placement="right-end">
                       <Link className="text-foreground cursor-pointer" onClick={() => setEditingTitle(true)}>
-                        <LuClipboardEdit size={26} />
+                        <LuClipboardPen size={26} />
                       </Link>
                     </Tooltip>
                   </div>
@@ -588,7 +619,7 @@ function PublicDashboard(props) {
           isBordered
           maxWidth={"full"}
           isBlurred={false}
-          className={"flex-grow-0 justify-between"}
+          className={"header flex-grow-0 justify-between"}
           style={{ backgroundColor: newChanges.backgroundColor || project.backgroundColor || "#FFFFFF" }}
         >
           <NavbarBrand>
@@ -650,47 +681,48 @@ function PublicDashboard(props) {
               </div>
             </div>
           </NavbarBrand>
-          <NavbarContent justify="end">
-            {!isSaved && !preview && (
-              <div className="hidden sm:block">
-                <Button
-                  color="success"
-                  endContent={<LuCheckCircle />}
-                  isLoading={saveLoading}
-                  onClick={_onSaveChanges}
-                >
-                  Save changes
-                </Button>
-              </div>
-            )}
-            {preview && (
-              <NavbarItem>
-                <Button
-                  onClick={() => setPreview(false)}
-                  endContent={<LuXCircle />}
-                  color="primary"
-                  variant="faded"
-                >
-                  Exit preview
-                </Button>
-              </NavbarItem>
-            )}
-
-            {project?.Team?.allowReportRefresh && (
-              <NavbarItem className="hidden sm:block">
-                <Button
-                  onClick={() => _onRefreshCharts()}
-                  endContent={<LuRefreshCw />}
-                  isLoading={refreshLoading}
-                  size="sm"
-                  color="primary"
-                >
-                  Refresh charts
-                </Button>
-              </NavbarItem>
-            )}
-          </NavbarContent>
         </Navbar>
+
+        <div className="absolute top-4 right-4 z-50">
+          {!isSaved && !preview && (
+            <div className="hidden sm:block">
+              <Button
+                color="success"
+                endContent={<LuCircleCheck />}
+                isLoading={saveLoading}
+                onClick={_onSaveChanges}
+              >
+                Save changes
+              </Button>
+            </div>
+          )}
+          {preview && (
+            <div>
+              <Button
+                onClick={() => setPreview(false)}
+                endContent={<LuCircleX />}
+                color="primary"
+                variant="faded"
+              >
+                Exit preview
+              </Button>
+            </div>
+          )}
+
+          {project?.Team?.allowReportRefresh && (
+            <div className="hidden sm:block">
+              <Button
+                onClick={() => _onRefreshCharts()}
+                endContent={<LuRefreshCw />}
+                isLoading={refreshLoading}
+                size="sm"
+                color="primary"
+              >
+                Refresh charts
+              </Button>
+            </div>
+          )}
+        </div>
 
         {charts && charts.length > 0 && _isOnReport() && (
           <div className="main-container relative p-2 pt-4 pb-10 md:pt-4 md:pb-10 md:pl-4 md:pr-4">
@@ -850,30 +882,9 @@ function PublicDashboard(props) {
         <SharingSettings
           open={showSettings}
           onClose={() => setShowSettings(false)}
-          project={project}
-          error={error}
-          onSaveBrewName={_onSaveBrewName}
-          brewLoading={saveLoading}
-          onToggleBranding={_onToggleBranding}
-          onTogglePublic={_onTogglePublic}
-          onTogglePassword={_onTogglePassword}
-          onSavePassword={_onSavePassword}
+          onReport={true}
         />
       )}
-
-      <ToastContainer
-        position="bottom-center"
-        autoClose={1500}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnVisibilityChange
-        draggable
-        pauseOnHover
-        transition={Flip}
-        theme={isDark ? "dark" : "light"}
-      />
     </div>
   );
 }

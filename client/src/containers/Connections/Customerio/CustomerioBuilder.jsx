@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Spacer, Checkbox, Tooltip, Divider, Tabs, Tab,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
-import { toast } from "react-toastify";
-import { LuInfo, LuMessageCircle, LuPlay, LuTrash, LuUsers2 } from "react-icons/lu";
+import toast from "react-hot-toast";
+import { LuInfo, LuMessageCircle, LuPlay, LuTrash, LuUsers } from "react-icons/lu";
 import { useParams } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -18,7 +18,7 @@ import CampaignsQuery from "./CampaignsQuery";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { runDataRequest, selectDataRequests } from "../../../slices/dataset";
 
 /*
@@ -35,8 +35,9 @@ function CustomerioBuilder(props) {
   const [entity, setEntity] = useState("");
   const [conditions, setConditions] = useState({});
   const [saveLoading, setSaveLoading] = useState(false);
+  const [requestError, setRequestError] = useState("");
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
 
@@ -119,6 +120,7 @@ function CustomerioBuilder(props) {
 
   const _onTest = () => {
     setRequestLoading(true);
+    setRequestError("");
 
     const drData = {
       ...cioRequest,
@@ -141,6 +143,9 @@ function CustomerioBuilder(props) {
           }
 
           const result = data.payload;
+          if (result?.status?.statusCode >= 400) {
+            setRequestError(result.response);
+          }
           if (result?.response?.dataRequest?.responseData?.data) {
             setResult(JSON.stringify(result.response.dataRequest.responseData.data, null, 2));
           }
@@ -239,7 +244,7 @@ function CustomerioBuilder(props) {
                   key="customers"
                   title={(
                     <div className="flex items-center space-x-2">
-                      <LuUsers2 />
+                      <LuUsers />
                       <span>Customers</span>
                     </div>
                   )}
@@ -336,11 +341,11 @@ function CustomerioBuilder(props) {
                   style={{ borderRadius: 10 }}
                   height="450px"
                   width="none"
-                  value={result || ""}
+                  value={requestError || result || ""}
                   name="resultEditor"
                   readOnly
                   editorProps={{ $blockScrolling: false }}
-                  className="Customerio-result-tut"
+                  className="Customerio-result-tut rounded-md border-1 border-solid border-content3"
                 />
               </div>
             </Row>

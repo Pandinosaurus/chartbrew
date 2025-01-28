@@ -5,11 +5,10 @@ import {
   Modal, Link as LinkNext, Spacer, Dropdown, Button, Navbar, Card,
   ModalBody, CircularProgress, NavbarBrand, NavbarContent, NavbarItem,
   DropdownTrigger, DropdownMenu, DropdownItem, CardBody, ModalFooter, ModalHeader, ModalContent, Avatar, Breadcrumbs, BreadcrumbItem,
-} from "@nextui-org/react";
-import useDarkMode from "@fisch0920/use-dark-mode";
-import { useLocalStorage } from "react-use";
+  Chip,
+} from "@heroui/react";
 import {
-  LuBook, LuChevronDown, LuCode2, LuContrast, LuGithub, LuHeartHandshake, LuLogOut,
+  LuBook, LuBookOpenText, LuChevronDown, LuContrast, LuFileCode2, LuGithub, LuHeartHandshake, LuSquareKanban, LuLogOut,
   LuMoon, LuSettings, LuSmile, LuSun, LuUser, LuWallpaper,
 } from "react-icons/lu";
 import { TbBrandDiscord } from "react-icons/tb";
@@ -19,12 +18,11 @@ import FeedbackForm from "./FeedbackForm";
 import cbLogo from "../assets/logo_blue.png";
 import cbLogoInverted from "../assets/logo_inverted.png";
 import canAccess from "../config/canAccess";
-import { DOCUMENTATION_HOST } from "../config/settings";
-import useThemeDetector from "../modules/useThemeDetector";
 import Container from "./Container";
 import Row from "./Row";
 import Text from "./Text";
 import { selectTeam, selectTeams } from "../slices/team";
+import { useTheme } from "../modules/ThemeContext";
 
 /*
   The navbar component used throughout the app
@@ -34,15 +32,13 @@ function NavbarContainer() {
   const [feedbackModal, setFeedbackModal] = useState();
   const [teamOwned, setTeamOwned] = useState({});
   const [showAppearance, setShowAppearance] = useState(false);
-  const [isOsTheme, setIsOsTheme] = useLocalStorage("osTheme", "false");
 
   const team = useSelector(selectTeam);
   const teams = useSelector(selectTeams);
   const project = useSelector((state) => state.project.active);
   const user = useSelector(selectUser);
 
-  const darkMode = useDarkMode(false);
-  const isSystemDark = useThemeDetector();
+  const { theme, setTheme, isDark } = useTheme();
   const params = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -79,29 +75,6 @@ function NavbarContainer() {
     return canAccess(role, user.id, team.TeamRoles);
   };
 
-  const _setOSTheme = () => {
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      darkMode.enable();
-    } else {
-      darkMode.disable();
-    }
-
-    window.localStorage.removeItem("darkMode");
-    setIsOsTheme(true);
-  };
-
-  const _setTheme = (mode) => {
-    setIsOsTheme(false);
-    if (mode === "dark") {
-      darkMode.enable();
-    } else {
-      darkMode.enable();
-      setTimeout(() => {
-        darkMode.disable();
-      }, 100);
-    }
-  };
-
   const _onDropdownAction = (key) => {
     switch (key) {
       case "discord": {
@@ -113,7 +86,7 @@ function NavbarContainer() {
         break;
       }
       case "documentation": {
-        window.open(DOCUMENTATION_HOST, "_blank");
+        window.open("https://docs.chartbrew.com", "_blank");
         break;
       }
       case "github": {
@@ -136,6 +109,17 @@ function NavbarContainer() {
         setShowAppearance(true);
         break;
       }
+      case "roadmap": {
+        window.open("https://chartbrew.com/roadmap", "_blank");
+        break;
+      }
+      case "api": {
+        window.open("https://docs.chartbrew.com/api-reference/introduction", "_blank");
+        break;
+      }
+      default: {
+        break;
+      }
     }
   }
 
@@ -156,19 +140,19 @@ function NavbarContainer() {
     <>
       <Navbar isBordered maxWidth="full" height={"3rem"} style={{ zIndex: 999 }}>
         <NavbarBrand>
-          <Link to="/user">
-            <img src={isSystemDark ? cbLogoInverted : cbLogo} alt="Chartbrew Logo" width={30}  />
+          <Link to="/">
+            <img src={isDark ? cbLogoInverted : cbLogo} alt="Chartbrew Logo" width={30}  />
           </Link>
           <Spacer x={4} />
           <Row align="center" className={"gap-1 hidden sm:flex"}>
             <Breadcrumbs variant="solid">
               {!params.teamId && (
-                <BreadcrumbItem key="home" onClick={() => navigate("/user")}>
+                <BreadcrumbItem key="home" onClick={() => navigate("/")}>
                   <Text>{"Home"}</Text>
                 </BreadcrumbItem>
               )}
               {params.teamId && (
-                <BreadcrumbItem key="team" onClick={() => navigate("/user")} isCurrent={!params.projectId}>
+                <BreadcrumbItem key="team" onClick={() => navigate("/")} isCurrent={!params.projectId}>
                   {team.name}
                 </BreadcrumbItem>
               )}
@@ -187,49 +171,55 @@ function NavbarContainer() {
         <NavbarContent justify="end">
           <NavbarItem>
             <LinkNext
-              className="changelog-trigger items-center text-foreground"
+              className="changelog-trigger flex flex-row items-center text-foreground"
               title="Changelog"
             >
-              <Text className={"hidden sm:block"}>Updates</Text>
               <span className="changelog-badge">
                 {changelogPadding && <span style={{ paddingLeft: 16, paddingRight: 16 }} />}
               </span>
+              <div className={"hidden sm:block text-sm"}>Updates</div>
             </LinkNext>
           </NavbarItem>
-          <Dropdown>
+          <Dropdown aria-label="Select a help option">
             <NavbarItem>
               <DropdownTrigger>
                 <Button
                   variant="light"
                   disableRipple
                   className="p-0 bg-transparent data-[hover=true]:bg-transparent"
-                  startContent={<LuHeartHandshake />}
+                  startContent={<LuHeartHandshake size={18} />}
                   radius="sm"
                 >
-                  Help
+                  Resources
                 </Button>
               </DropdownTrigger>
             </NavbarItem>
             <DropdownMenu variant="faded" onAction={(key) => _onDropdownAction(key)}>
-              <DropdownItem startContent={<TbBrandDiscord />} key="discord">
+              <DropdownItem startContent={<TbBrandDiscord />} key="discord" textValue="Join our Discord">
                 <Text>{"Join our Discord"}</Text>
               </DropdownItem>
-              <DropdownItem startContent={<LuBook />} key="tutorials">
+              <DropdownItem startContent={<LuSquareKanban />} key="roadmap" textValue="Roadmap" endContent={<Chip variant="flat" color="secondary" size="sm" radius="sm">New</Chip>}>
+                <Text>{"Roadmap"}</Text>
+              </DropdownItem>
+              <DropdownItem startContent={<LuBook />} key="tutorials" textValue="Blog tutorials">
                 <Text>{"Blog tutorials"}</Text>
               </DropdownItem>
-              <DropdownItem startContent={<LuCode2 />} key="documentation">
+              <DropdownItem startContent={<LuBookOpenText />} key="documentation" textValue="Documentation">
                 <Text>{"Documentation"}</Text>
               </DropdownItem>
-              <DropdownItem startContent={<LuGithub />} key="github">
+              <DropdownItem startContent={<LuFileCode2 />} key="api" textValue="API Reference">
+                <Text>{"API Reference"}</Text>
+              </DropdownItem>
+              <DropdownItem startContent={<LuGithub />} key="github" textValue="GitHub">
                 <Text>{"GitHub"}</Text>
               </DropdownItem>
-              <DropdownItem startContent={<LuSmile />} key="feedback">
+              <DropdownItem startContent={<LuSmile />} key="feedback" textValue="Feedback">
                 <Text>{"Feedback"}</Text>
               </DropdownItem>
             </DropdownMenu>
           </Dropdown>
 
-          <Dropdown>
+          <Dropdown aria-label="Select a user option">
             <NavbarItem>
               <DropdownTrigger>
                 <div>
@@ -254,10 +244,10 @@ function NavbarContainer() {
                 </Link>
               </DropdownItem>
               {_canAccess("teamAdmin", teamOwned) && (
-                <DropdownItem startContent={<LuSettings />} key="account" textValue="Account settings">
+                <DropdownItem startContent={<LuSettings />} key="account" textValue="Team settings">
                   <Link to={`/manage/${team?.id || teamOwned.id}/settings`}>
                     <div className="w-full text-foreground">
-                      Account settings
+                      Team settings
                     </div>
                   </Link>
                 </DropdownItem>
@@ -275,7 +265,7 @@ function NavbarContainer() {
                 </div>
               </DropdownItem>
 
-              <DropdownItem startContent={<LuLogOut />} onClick={() => dispatch(logout())}>
+              <DropdownItem startContent={<LuLogOut />} onClick={() => dispatch(logout())} textValue="Sign out">
                 Sign out
               </DropdownItem>
             </DropdownMenu>
@@ -308,9 +298,9 @@ function NavbarContainer() {
             <div className="flex flex-row justify-between gap-2">
               <Card
                 isPressable
-                borderWeight={!isSystemDark && !isOsTheme ? "extrabold" : "normal"}
-                onClick={() => _setTheme("light")}
-                className={`bg-white ${!isSystemDark && !isOsTheme ? "border-secondary" : "border-content3"} border-2 border-solid min-w-[100px]`}
+                borderWeight={theme === "light" ? "extrabold" : "normal"}
+                onClick={() => setTheme("light")}
+                className={`bg-white ${theme === "light" ? "border-secondary" : "border-content3"} border-2 border-solid min-w-[100px]`}
                 variant={"bordered"}
               >
                 <CardBody>
@@ -323,9 +313,9 @@ function NavbarContainer() {
 
               <Card
                 isPressable
-                className={`bg-black ${isSystemDark && !isOsTheme ? "border-secondary" : "border-content3"} border-2 border-solid min-w-[100px]`}
-                borderWeight={isSystemDark && !isOsTheme ? "extrabold" : "normal"}
-                onClick={() => _setTheme("dark")}
+                className={`bg-black ${theme === "dark" ? "border-secondary" : "border-content3"} border-2 border-solid min-w-[100px]`}
+                borderWeight={theme === "dark" ? "extrabold" : "normal"}
+                onClick={() => setTheme("dark")}
                 variant={"bordered"}
               >
                 <CardBody>
@@ -339,14 +329,14 @@ function NavbarContainer() {
               <Card
                 isPressable
                 variant={"bordered"}
-                onClick={_setOSTheme}
-                borderWeight={isOsTheme ? "extrabold" : "normal"}
-                className={`bg-content3 ${isOsTheme ? "border-secondary" : "border-content3"} border-2 border-solid min-w-[100px]`}
+                onClick={() => setTheme("system")}
+                borderWeight={theme === "system" ? "extrabold" : "normal"}
+                className={`bg-content3 ${theme === "system" ? "border-secondary" : "border-content3"} border-2 border-solid min-w-[100px]`}
               >
                 <CardBody>
-                  <LuContrast size={24} color={isSystemDark ? "white" : "black"} />
+                  <LuContrast size={24} color={isDark ? "white" : "black"} />
                   <Row align={"center"} className={"gap-2"}>
-                    <Text h5 className={isSystemDark ? "text-white" : "text-black"}>System</Text>
+                    <Text h5 className={isDark ? "text-white" : "text-black"}>System</Text>
                   </Row>
                 </CardBody>
               </Card>

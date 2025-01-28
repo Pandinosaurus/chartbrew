@@ -4,7 +4,7 @@ import React, {
 import PropTypes from "prop-types";
 import {
   Button, Input, Link, Spacer, Image, Chip, semanticColors, Accordion, AccordionItem, Divider,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import { useDropzone } from "react-dropzone";
 import { LuFileCode2, LuExternalLink } from "react-icons/lu";
@@ -18,7 +18,7 @@ import realtimeDbImage from "../../../assets/realtime-db-url.webp";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router";
 import { testRequest } from "../../../slices/connection";
@@ -40,7 +40,7 @@ function RealtimeDbConnectionForm(props) {
   const [jsonVisible, setJsonVisible] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
 
@@ -199,7 +199,7 @@ function RealtimeDbConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-semibold">
           {!editConnection && "Connect to Realtime Database"}
@@ -403,7 +403,7 @@ function RealtimeDbConnectionForm(props) {
             <Spacer y={1} />
             <AceEditor
               mode="json"
-              theme="tomorrow"
+              theme={isDark ? "one_dark" : "tomorrow"}
               height="150px"
               width="none"
               value={testResult.body || "Hello"}

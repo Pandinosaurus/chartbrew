@@ -2,16 +2,20 @@ import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  Avatar,
   Button, Checkbox, Chip, Divider, Input, Link, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Popover, PopoverContent,
   PopoverTrigger, ScrollShadow, Spacer, Tooltip, commonColors,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { TbMathFunctionY, TbProgressCheck } from "react-icons/tb";
 import { TwitterPicker, SketchPicker } from "react-color";
 import { useNavigate, useParams } from "react-router";
+import { Link as LinkNext } from "react-router-dom";
 import {
-  LuArrowDown01, LuArrowDown10, LuCheck, LuCheckCircle, LuInfo,
+  LuArrowDown01, LuArrowDown10, LuCheck, LuCircleCheck, LuInfo,
+  LuListFilter,
+  LuPlug,
   LuSettings,
-  LuWand2, LuXCircle,
+  LuWandSparkles, LuCircleX,
 } from "react-icons/lu";
 
 import Text from "../../../components/Text";
@@ -25,9 +29,11 @@ import FormulaTips from "../../../components/FormulaTips";
 import canAccess from "../../../config/canAccess";
 import { selectTeam } from "../../../slices/team";
 import { selectUser } from "../../../slices/user";
+import connectionImages from "../../../config/connectionImages";
+import { useTheme } from "../../../modules/ThemeContext";
 
 function ChartDatasetConfig(props) {
-  const { chartId, datasetId } = props;
+  const { chartId, datasetId, dataRequests } = props;
 
   const [legend, setLegend] = useState("");
   const [formula, setFormula] = useState("");
@@ -45,6 +51,7 @@ function ChartDatasetConfig(props) {
   const dispatch = useDispatch();
   const params = useParams();
   const navigate = useNavigate();
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (cdc.formula) {
@@ -253,7 +260,7 @@ function ChartDatasetConfig(props) {
       {canAccess("teamAdmin", user.id, team.TeamRoles) && (
         <>
           <Spacer y={2} />
-          <Row>
+          <div className="flex flex-row justify-between">
             <Button
               variant="ghost"
               size="sm"
@@ -262,7 +269,21 @@ function ChartDatasetConfig(props) {
             >
               Edit dataset
             </Button>
-          </Row>
+
+            <div className="flex flex-row gap-2 items-center">
+              {dataRequests?.map((dr) => (
+                <Tooltip content={dr?.Connection?.name} key={dr.id}>
+                  <Avatar
+                    key={dr.id}
+                    src={connectionImages(isDark)[dr?.Connection?.subType]}
+                    isBordered
+                    size="sm"
+                  />
+                </Tooltip>
+              ))}
+              <div><LuPlug /></div>
+            </div>
+          </div>
         </>
       )}
 
@@ -318,7 +339,7 @@ function ChartDatasetConfig(props) {
                   <Spacer x={0.5} />
                   <Tooltip content="Clear sorting">
                     <Link className="text-danger" onClick={() => _onUpdateCdc({ sort: "" })}>
-                      <LuXCircle className="text-danger" />
+                      <LuCircleX className="text-danger" />
                     </Link>
                   </Tooltip>
                 </>
@@ -346,7 +367,7 @@ function ChartDatasetConfig(props) {
                       <>
                         <Tooltip content="Save">
                           <Link className="text-success" onClick={() => _onUpdateCdc({ maxRecords: maxRecords })}>
-                            <LuCheckCircle className="text-success" />
+                            <LuCircleCheck className="text-success" />
                           </Link>
                         </Tooltip>
                         <Spacer x={1} />
@@ -360,7 +381,7 @@ function ChartDatasetConfig(props) {
                           setMaxRecords("");
                         }}
                       >
-                        <LuXCircle className="text-danger" />
+                        <LuCircleX className="text-danger" />
                       </Link>
                     </Tooltip>
                 </>
@@ -426,18 +447,18 @@ function ChartDatasetConfig(props) {
                         content={"Apply the formula"}
                       >
                         <Link onClick={_onApplyFormula}>
-                          <LuCheckCircle className={"text-success"} />
+                          <LuCircleCheck className={"text-success"} />
                         </Link>
                       </Tooltip>
                     )}
                     <Tooltip content="Remove formula">
                       <Link onClick={_onRemoveFormula}>
-                        <LuXCircle className="text-danger" />
+                        <LuCircleX className="text-danger" />
                       </Link>
                     </Tooltip>
                     <Tooltip content="Click for an example">
                       <Link onClick={_onExampleFormula}>
-                        <LuWand2 className="text-primary" />
+                        <LuWandSparkles className="text-primary" />
                       </Link>
                     </Tooltip>
                   </div>
@@ -482,7 +503,7 @@ function ChartDatasetConfig(props) {
                       content={"Save goal"}
                     >
                       <Link onClick={() => _onUpdateCdc({ goal })}>
-                        <LuCheckCircle className={"text-success"} />
+                        <LuCircleCheck className={"text-success"} />
                       </Link>
                     </Tooltip>
                   )}
@@ -491,7 +512,7 @@ function ChartDatasetConfig(props) {
                       _onUpdateCdc({ goal: null });
                       setGoal("");
                     }}>
-                      <LuXCircle className="text-danger" />
+                      <LuCircleX className="text-danger" />
                     </Link>
                   </Tooltip>
                 </Row>
@@ -516,6 +537,18 @@ function ChartDatasetConfig(props) {
               projectId={params.projectId}
             />
           </Row>
+
+          <Spacer y={4} />
+          <Divider />
+          <Spacer y={4} />
+          
+          <div>
+            <LinkNext to={`/${params.teamId}/dataset/${cdc.dataset_id}?project_id=${params.projectId}&chart_id=${chartId}&editFilters=true`} className="flex items-center cursor-pointer chart-cdc-goal">
+              <LuListFilter size={24} className="text-primary" />
+              <Spacer x={0.5} />
+              <Text>Edit filters</Text>
+            </LinkNext>
+          </div>
         </>
       )}
 
@@ -648,7 +681,7 @@ function ChartDatasetConfig(props) {
 
       <Modal isOpen={editConfirmation} onClose={() => setEditConfirmation(false)}>
         <ModalContent>
-          <ModalHeader>Editting dataset?</ModalHeader>
+          <ModalHeader>Edit dataset?</ModalHeader>
           <ModalBody>
             <Text>
               {"You are about to edit the dataset. This will affect all charts that use this dataset. Are you sure you want to continue?"}
@@ -665,7 +698,7 @@ function ChartDatasetConfig(props) {
               color="primary"
               onClick={() => {
                 setEditConfirmation(false);
-                navigate(`/${params.teamId}/dataset/${cdc.dataset_id}`);
+                navigate(`/${params.teamId}/dataset/${cdc.dataset_id}?project_id=${params.projectId}&chart_id=${chartId}`);
               }}
             >
               Continue
@@ -680,6 +713,11 @@ function ChartDatasetConfig(props) {
 ChartDatasetConfig.propTypes = {
   datasetId: PropTypes.number.isRequired,
   chartId: PropTypes.number.isRequired,
+  dataRequests: PropTypes.array,
+};
+
+ChartDatasetConfig.defaultProps = {
+  dataRequests: [],
 };
 
 export default ChartDatasetConfig

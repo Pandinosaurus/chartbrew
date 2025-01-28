@@ -1,3 +1,8 @@
+// set up the encryption keys first, then load .env file
+const setUpEncryptionKeys = require("./modules/setUpEncryptionKeys"); // eslint-disable-line
+
+setUpEncryptionKeys();
+
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
@@ -7,7 +12,6 @@ const { urlencoded, json } = require("body-parser");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const _ = require("lodash");
-const { OneAccount } = require("oneaccount-express");
 const morgan = require("morgan");
 const helmet = require("helmet");
 const fs = require("fs");
@@ -15,19 +19,22 @@ const busboy = require("connect-busboy");
 
 const settings = process.env.NODE_ENV === "production" ? require("./settings") : require("./settings-dev");
 const routes = require("./api");
-const updateChartsCron = require("./modules/updateChartsCron");
+
 const cleanChartCache = require("./modules/CleanChartCache");
 const cleanAuthCache = require("./modules/CleanAuthCache");
-const AuthCacheController = require("./controllers/AuthCacheController");
 const parseQueryParams = require("./middlewares/parseQueryParams");
 const db = require("./models/models");
 const packageJson = require("./package.json");
+const cleanGhostChartsCron = require("./modules/cleanGhostChartsCron");
+const { checkEncryptionKeys } = require("./modules/cbCrypto");
+const setUpQueues = require("./setUpQueues");
 
-const authCache = new AuthCacheController();
+// check if the encryption keys are valid 32-byte hex strings
+checkEncryptionKeys();
 
 // set up folders
-fs.mkdir(".cache", () => {});
-fs.mkdir("uploads", () => {});
+fs.mkdir(".cache", () => { });
+fs.mkdir("uploads", () => { });
 
 const app = express();
 app.settings = settings;
@@ -43,19 +50,12 @@ app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
 app.use(json());
 app.use(methodOverride("X-HTTP-Method-Override"));
-app.use(helmet());
-app.use(cors());
-app.use(new OneAccount({
-  engine: {
-    set: (k, v) => {
-      authCache.set(k, v);
-    },
-    get: async (k) => {
-      const v = await authCache.get(k); authCache.delete(k); return v;
-    }
-  },
-  callbackURL: "/oneaccountauth"
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
+// app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
+app.use(cors());
 //---------------------------------------
 
 app.get("/", (req, res) => {
@@ -98,9 +98,10 @@ db.migrate()
       if (isMainCluster || !process.env.NODE_APP_INSTANCE) {
         // start CronJob, making sure the database is populated for the first time
         setTimeout(() => {
-          updateChartsCron();
+          setUpQueues(app);
           cleanChartCache();
           cleanAuthCache();
+          cleanGhostChartsCron();
         }, 5000);
       }
 

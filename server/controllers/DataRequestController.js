@@ -1,5 +1,7 @@
 const ConnectionController = require("./ConnectionController");
+const drCacheController = require("./DataRequestCacheController");
 const db = require("../models/models");
+const { generateSqlQuery } = require("../modules/ai/generateSqlQuery");
 
 class RequestController {
   constructor() {
@@ -165,7 +167,18 @@ class RequestController {
               { configuration: newConfiguration },
               { where: { id: response.dataRequest.id } },
             );
+
+            try {
+              const drCache = await drCacheController.findLast(dataRequest.id);
+              if (drCache?.responseData?.configuration) {
+                drCache.responseData.configuration = newConfiguration;
+                drCacheController.update(drCache, dataRequest.id);
+              }
+            } catch (e) {
+              // do nothing
+            }
           }
+          // console.log("newConfiguration", newConfiguration);
         }
 
         return Promise.resolve({
@@ -187,6 +200,24 @@ class RequestController {
       })
       .catch((error) => {
         return new Promise((resolve, reject) => reject(error));
+      });
+  }
+
+  askAi(id, question, conversationHistory, currentQuery) {
+    return this.findById(id)
+      .then(async (dataRequest) => {
+        const connection = await db.Connection.findByPk(dataRequest.Connection.id);
+        if (!connection?.schema) {
+          return Promise.reject(new Error("No schema found. Please test your connection first."));
+        }
+
+        const aiResponse = await generateSqlQuery(
+          connection.schema, question, conversationHistory, currentQuery
+        );
+        return aiResponse;
+      })
+      .catch((error) => {
+        return Promise.reject(error);
       });
   }
 }

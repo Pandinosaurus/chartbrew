@@ -1,8 +1,8 @@
 import React from "react";
 import PropTypes from "prop-types";
 import {
-  Card, CardBody, CardFooter, CardHeader, Divider, Image, Link, Spacer,
-} from "@nextui-org/react";
+  Card, CardBody, CardFooter, CardHeader, Divider, Link, Spacer,
+} from "@heroui/react";
 import { LuGraduationCap } from "react-icons/lu";
 
 import Row from "./Row";
@@ -69,6 +69,24 @@ const bannerData = {
     url: "https://chartbrew.com/blog/connect-and-visualize-timescaledb-data-with-chartbrew/",
     info: "5 min read",
   },
+  supabasedb: {
+    title: "How to visualize your Supabase data with Chartbrew",
+    description: "Chartbrew can connect to your Supabase database and create charts that tell you more about your data.",
+    url: "https://chartbrew.com/blog/connect-and-visualize-supabase-database-with-chartbrew/",
+    info: "5 min read",
+  },
+  rdsPostgres: {
+    title: "How to connect Amazon RDS Postgres to Chartbrew",
+    description: "Chartbrew can connect to your RDS Postgres database and create charts that tell you more about your data.",
+    url: "https://chartbrew.com/blog/how-to-connect-and-visualize-amazon-rds-with-chartbrew/",
+    info: "5 min read",
+  },
+  rdsMysql: {
+    title: "How to connect Amazon RDS MySQL to Chartbrew",
+    description: "Chartbrew can connect to your RDS MySQL database and create charts that tell you more about your data.",
+    url: "https://chartbrew.com/blog/how-to-connect-and-visualize-amazon-rds-with-chartbrew/",
+    info: "5 min read",
+  },
 }
 
 function HelpBanner(props) {
@@ -79,6 +97,10 @@ function HelpBanner(props) {
     window.open(bannerData[type].url, "_blank");
   };
 
+  if (!bannerData[type]) {
+    return null;
+  }
+
   return (
     <Card
       isPressable
@@ -88,12 +110,14 @@ function HelpBanner(props) {
       shadow="sm"
     >
       <CardHeader className="flex gap-3">
-        <Image
-          src={imageUrl}
-          width={80}
-          height={80}
-          radius="sm"
-        />
+        <div>
+          <img
+            src={imageUrl}
+            width={100}
+            height={80}
+            radius="sm"
+          />
+        </div>
         <div>
           <Link
             className={"font-bold text-start"}

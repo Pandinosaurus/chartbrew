@@ -4,7 +4,7 @@ import { PropTypes } from "prop-types";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Button, Input, Spacer,
-} from "@nextui-org/react";
+} from "@heroui/react";
 
 import { changePasswordWithToken } from "../slices/user";
 import { cleanErrors as cleanErrorsAction } from "../actions/error";
@@ -12,7 +12,7 @@ import cbLogoSmall from "../assets/logo_inverted.png";
 import cbLogo from "../assets/logo_blue.png";
 import Row from "../components/Row";
 import Text from "../components/Text";
-import useThemeDetector from "../modules/useThemeDetector";
+import { useTheme } from "../modules/ThemeContext";
 import Callout from "../components/Callout";
 
 /*
@@ -28,7 +28,7 @@ function PasswordReset(props) {
   const { cleanErrors } = props;
   const navigate = useNavigate();
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
 
   useEffect(() => {

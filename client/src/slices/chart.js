@@ -277,8 +277,8 @@ export const testQuery = createAsyncThunk(
 
 export const getEmbeddedChart = createAsyncThunk(
   "chart/getEmbeddedChart",
-  async ({ embed_id }) => {
-    const url = `${API_HOST}/chart/${embed_id}/embedded`;
+  async ({ embed_id, snapshot }) => {
+    const url = `${API_HOST}/chart/${embed_id}/embedded${snapshot ? "?snapshot=true" : ""}`;
     const method = "GET";
     const headers = new Headers({
       "Accept": "application/json",
@@ -591,16 +591,18 @@ export const chartSlice = createSlice({
       })
       .addCase(runQuery.fulfilled, (state, action) => {
         state.loading = false;
-        state.data = state.data.map((chart) => {
-          if (chart.id === action.payload.id) {
-            return {
-              ...chart,
-              ...action.payload,
-              loading: false,
-            };
-          }
-          return chart;
-        });
+        if (!action.meta.arg.skipStateUpdate) {
+          state.data = state.data.map((chart) => {
+            if (chart.id === action.payload.id) {
+              return {
+                ...chart,
+                ...action.payload,
+                loading: false,
+              };
+            }
+            return chart;
+          });
+        }
       })
       .addCase(runQuery.rejected, (state, action) => {
         state.loading = false;

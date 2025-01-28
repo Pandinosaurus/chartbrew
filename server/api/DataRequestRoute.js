@@ -1,7 +1,16 @@
+const rateLimit = require("express-rate-limit");
+
 const DataRequestController = require("../controllers/DataRequestController");
 const TeamController = require("../controllers/TeamController");
 const verifyToken = require("../modules/verifyToken");
 const DatasetController = require("../controllers/DatasetController");
+
+const apiLimiter = (max = 10) => {
+  return rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max,
+  });
+};
 
 module.exports = (app) => {
   const dataRequestController = new DataRequestController();
@@ -27,7 +36,7 @@ module.exports = (app) => {
       return next();
     }
 
-    if (role === "projectAdmin" || role === "projectViewer") {
+    if (role === "projectAdmin" || role === "projectEditor" || role === "projectViewer") {
       const connections = await datasetController.findByProjects(team_id, projects);
       if (!connections || connections.length === 0) {
         return res.status(404).json({ message: "No connections found" });
@@ -166,6 +175,25 @@ module.exports = (app) => {
           return res.status(401).send({ error: "Not authorized" });
         }
 
+        return res.status(400).json({ error: error.message });
+      });
+  });
+  // -------------------------------------------------
+
+  /*
+  ** Route to ask AI a question
+  */
+  app.post(`${root}/:id/askAi`, verifyToken, checkPermissions, apiLimiter(10), (req, res) => {
+    return dataRequestController.askAi(
+      req.params.id,
+      req.body.question,
+      req.body.conversationHistory,
+      req.body.currentQuery,
+    )
+      .then((aiResponse) => {
+        return res.status(200).send(aiResponse);
+      })
+      .catch((error) => {
         return res.status(400).send(error);
       });
   });

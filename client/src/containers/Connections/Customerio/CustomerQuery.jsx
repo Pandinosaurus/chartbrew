@@ -3,14 +3,13 @@ import PropTypes from "prop-types";
 import {
   Button, Input, Spacer, Chip, Checkbox, Divider,
   CircularProgress, Select, SelectItem,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { isEqual } from "lodash";
-import { LuCheckCircle, LuCloud, LuFolder, LuUser, LuWrench, LuXCircle } from "react-icons/lu";
+import { LuCheck, LuCloud, LuFolder, LuUser, LuWrench, LuX } from "react-icons/lu";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router";
 
 import { runHelperMethod } from "../../../slices/connection";
-import { primary, secondary } from "../../../config/colors";
 import determineType from "../../../modules/determineType";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
@@ -57,7 +56,7 @@ function CustomerQuery(props) {
       methodName: "getAllSegments"
     }))
       .then((data) => {
-        const segmentData = data.payload.segments;
+        const segmentData = data.payload;
         const segmentOptions = segmentData.map((segment) => {
           return {
             text: segment.name,
@@ -224,7 +223,7 @@ function CustomerQuery(props) {
     return (
       <Container>
         <Row>
-          <CircularProgress size="xl" />
+          <CircularProgress size="xl" aria-label="Loading segments" />
         </Row>
       </Container>
     );
@@ -242,6 +241,7 @@ function CustomerQuery(props) {
             onSelectionChange={(keys) => _onChangeOperation(keys.currentKey)}
             selectedKeys={[mainOperation]}
             selectionMode="single"
+            aria-label="Select an operation"
           >
             {customerOperations.map((operation) => (
               <SelectItem key={operation.key} textValue={operation.text}>
@@ -253,7 +253,7 @@ function CustomerQuery(props) {
       )}
       <Spacer y={2} />
 
-      <Row wrap="wrap" align="center">
+      <Row wrap="wrap" align="center" className={"gap-1"}>
         {conditions[mainOperation] && conditions[mainOperation].map((condition) => {
           return (
             <Fragment
@@ -268,10 +268,10 @@ function CustomerQuery(props) {
                   variant={"bordered"}
                   startContent={<LuFolder />}
                   endContent={(
-                    <LuXCircle onClick={() => _onRemoveCondition("segment", condition.segment.id)} />
+                    <LuX size={16} className="text-danger cursor-pointer" onClick={() => _onRemoveCondition("segment", condition.segment.id)} />
                   )}
                 >
-                  <span style={{ color: primary }}>
+                  <span className="text-primary">
                     {`in ${_getSegmentName(condition.segment.id)}`}
                   </span>
                 </Chip>
@@ -281,10 +281,10 @@ function CustomerQuery(props) {
                   variant={"bordered"}
                   startContent={<LuFolder />}
                   endContent={(
-                    <LuXCircle onClick={() => _onRemoveCondition("segment", condition.not.segment.id)} />
+                    <LuX size={16} className="text-danger cursor-pointer" onClick={() => _onRemoveCondition("segment", condition.not.segment.id)} />
                   )}
                 >
-                  <span style={{ color: primary }}>
+                  <span className="text-primary">
                     {`not in  ${_getSegmentName(condition.not.segment.id)}`}
                   </span>
                 </Chip>
@@ -294,17 +294,17 @@ function CustomerQuery(props) {
                   variant={"bordered"}
                   startContent={<LuFolder />}
                   endContent={(
-                    <LuXCircle onClick={() => _onRemoveCondition("segment", condition.or)} />
+                    <LuX size={16} className="text-danger cursor-pointer" onClick={() => _onRemoveCondition("segment", condition.or)} />
                   )}
                 >
-                  <span style={{ marginRight: 3 }}>{"in"}</span>
+                  <span className="mr-1">{"in"}</span>
                   {condition.or.map((sub, index) => {
                     if (sub.segment && sub.segment.id) {
                       return (
                         <span key={sub.segment.id}>
-                          <span style={{ color: primary }}>{`${_getSegmentName(sub.segment.id)} `}</span>
+                          <span className="text-primary">{`${_getSegmentName(sub.segment.id)} `}</span>
                           {index < condition.or.length - 1 && (
-                            <span style={{ marginRight: 3 }}>or</span>
+                            <span className="mr-1">or</span>
                           )}
                         </span>
                       );
@@ -318,15 +318,15 @@ function CustomerQuery(props) {
                   variant={"bordered"}
                   startContent={<LuFolder />}
                   endContent={(
-                    <LuXCircle onClick={() => _onRemoveCondition("segment", condition.not)} />
+                    <LuX size={16} className="text-danger cursor-pointer" onClick={() => _onRemoveCondition("segment", condition.not)} />
                   )}
                 >
-                  <span style={{ marginRight: 3 }}>{"not in"}</span>
+                  <span className="mr-1">{"not in"}</span>
                   {condition.not.or.map((sub, index) => {
                     if (sub.segment && sub.segment.id) {
                       return (
                         <span key={sub.segment.id}>
-                          <span style={{ color: primary }}>{`${_getSegmentName(sub.segment.id)}`}</span>
+                          <span className="text-primary">{`${_getSegmentName(sub.segment.id)}`}</span>
                           {`${index < condition.not.or.length - 1 ? " or- " : ""}`}
                         </span>
                       );
@@ -342,23 +342,23 @@ function CustomerQuery(props) {
                   variant={"bordered"}
                   startContent={<LuUser />}
                   endContent={(
-                    <LuXCircle onClick={() => _onRemoveCondition("attribute", condition.attribute.field)} />
+                    <LuX size={16} className="text-danger cursor-pointer" onClick={() => _onRemoveCondition("attribute", condition.attribute.field)} />
                   )}
                 >
-                  <span style={{ color: primary, marginRight: 3 }}>
+                  <span className="text-primary mr-1">
                     {`${condition.attribute.field}`}
                   </span>
                   {condition.attribute.operator === "eq" && (
                     <>
-                      <span className="mx-3">is</span>
+                      <span className="mr-1">is</span>
                     </>
                   )}
-                  <span style={{ color: secondary, marginRight: 3 }}>
+                  <span className="text-secondary mr-1">
                     {`${_getOperatorName(condition.attribute.operator)}`}
                   </span>
                   {condition.attribute.operator === "eq" && (
                     <>
-                      <span style={{ color: primary, marginRight: 3 }}>
+                      <span className="text-primary">
                         {`to ${condition.attribute.value}`}
                       </span>
                     </>
@@ -367,37 +367,44 @@ function CustomerQuery(props) {
               )}
               {condition.not && condition.not.attribute && (
                 <Chip
-                  radius="sm"
+                  variant="bordered"
                   startContent={<LuUser />}
                   endContent={(
-                    <LuXCircle onClick={() => _onRemoveCondition("attribute", condition.not)} />
+                    <LuX size={16} className="text-danger cursor-pointer" onClick={() => _onRemoveCondition("attribute", condition.not)} />
                   )}
                 >
-                  <span style={{ color: primary, marginRight: 3 }}>
+                  <span className="text-primary mr-1">
                     {`${condition.not.attribute.field}`}
                   </span>
                   {condition.not.attribute.operator === "eq" && (
                     <>
-                      <span className="mr-3">is</span>
+                      <span className="mr-1">is</span>
                     </>
                   )}
-                  <span style={{ color: secondary, marginRight: 3 }}>
+                  <span className="text-secondary mr-1">
                     {`${_getOperatorName(`not,${condition.not.attribute.operator}`)}`}
                   </span>
                   {condition.not.attribute.operator === "eq" && (
                     <>
-                      <span style={{ color: primary, marginRight: 3 }}>
+                      <span className="text-primary">
                         {`to ${condition.not.attribute.value}`}
                       </span>
                     </>
                   )}
                 </Chip>
               )}
-              <Spacer x={1} />
             </Fragment>
           );
         })}
       </Row>
+
+      {conditions[mainOperation]?.length > 0 &&(
+        <>
+          <Spacer y={4} />
+          <Divider />
+          <Spacer y={2} />
+        </>
+      )}
 
       <Spacer y={2} />
       {!segmentConfig && !attributeConfig && (
@@ -429,9 +436,10 @@ function CustomerQuery(props) {
             variant="bordered"
             placeholder="Select an operation"
             onSelectionChange={(keys) => setSegmentConfig({ ...segmentConfig, operation: keys.currentKey })}
-            selectedKeys={[segmentConfig.operation]}
+            selectedKeys={[segmentConfig.operation || "in"]}
             selectionMode="single"
             defaultSelectedKeys={["in"]}
+            aria-label="Select an operation"
           >
             {filterOperations.map((operation) => (
               <SelectItem key={operation.value} textValue={operation.text}>
@@ -442,35 +450,27 @@ function CustomerQuery(props) {
           <Spacer x={1} />
           <Select
             variant="bordered"
-            placeholder="Select a segment"
+            placeholder="Select segments"
             onSelectionChange={(keys) => {
-              // add to the list if not already in it
-              if (!segmentConfig.ids || !segmentConfig.ids.includes(keys.currentKey)) {
-                setSegmentConfig({
-                  ...segmentConfig,
-                  ids: !segmentConfig.ids ? [keys.currentKey] : [...segmentConfig.ids, keys.currentKey]
-                });
-              } else {
-                setSegmentConfig({
-                  ...segmentConfig, ids: segmentConfig.ids.filter((t) => t !== keys.currentKey)
-                });
-              }
+              setSegmentConfig({
+                ...segmentConfig,
+                ids: [...keys],
+              });
             }}
             selectedKeys={segmentConfig.ids || []}
             selectionMode="multiple"
             renderValue={(items) => (
-              <div className="flex flex-wrap gap-2">
-                {items.map((item) => (
-                  <Chip key={item}>
-                    {segments.find((segment) => segment.value === item)?.text}
-                  </Chip>
-                ))}
+              <div className="flex flex-row flex-wrap gap-2">
+                <Chip size="sm" variant="flat">
+                  {items.length === 1 ? `${items[0].textValue}` : `${items.length} selected`}
+                </Chip>
               </div>
             )}
+            aria-label="Select segments"
           >
             {segments.map((segment) => (
               <SelectItem
-                key={segment.value}
+                key={segment.key}
                 startContent={segment.icon}
                 textValue={segment.text}
               >
@@ -484,18 +484,19 @@ function CustomerQuery(props) {
             onClick={_onAddSegmentCondition}
             size="sm"
             color="success"
+            variant="light"
           >
-            <LuCheckCircle />
+            <LuCheck />
           </Button>
           <Spacer x={1} />
           <Button
             isIconOnly
             color="danger"
-            variant="flat"
+            variant="light"
             onClick={() => setSegmentConfig(null)}
             size="sm"
           >
-            <LuXCircle />
+            <LuX />
           </Button>
         </Row>
       )}
@@ -525,6 +526,7 @@ function CustomerQuery(props) {
             )}
             defaultSelectedKeys={["eq"]}
             labelPlacement="outsite"
+            aria-label="Select an operation"
           >
             {attributeOperations.map((operation) => (
               <SelectItem key={operation.value} textValue={operation.text}>
@@ -550,10 +552,10 @@ function CustomerQuery(props) {
             isIconOnly
             onClick={_onAddAttributeCondition}
             size="sm"
-            variant="flat"
+            variant="light"
             color="success"
           >
-            <LuCheckCircle />
+            <LuCheck />
           </Button>
           <Spacer x={1} />
           <Button
@@ -561,9 +563,9 @@ function CustomerQuery(props) {
             onClick={() => setAttributeConfig(null)}
             size="sm"
             color="danger"
-            variant="flat" 
+            variant="light" 
           >
-            <LuXCircle />
+            <LuX />
           </Button>
         </Row>
       )}

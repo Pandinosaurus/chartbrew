@@ -38,7 +38,7 @@ module.exports = (app) => {
         return next();
       }
 
-      if (role === "projectAdmin" || role === "projectViewer") {
+      if (role === "projectAdmin" || role === "projectViewer" || role === "projectEditor") {
         // const connections = await connectionController.findByProjects(projects);
         // if (!connections || connections.length === 0) {
         //   return res.status(404).json({ message: "No connections found" });
@@ -154,7 +154,7 @@ module.exports = (app) => {
       user_id: req.user.id,
     };
 
-    const token = jwt.sign(payload, app.settings.secret, {
+    const token = jwt.sign(payload, app.settings.encryptionKey, {
       expiresIn: 2592000 // a month
     }, (err, token) => {
       if (err) throw new Error(err);
@@ -175,7 +175,7 @@ module.exports = (app) => {
     }
 
     let newRole = {};
-    return jwt.verify(req.body.token, app.settings.secret, (err, decoded) => {
+    return jwt.verify(req.body.token, app.settings.encryptionKey, (err, decoded) => {
       return teamController.addTeamRole(decoded.team_id, req.user.id, decoded.role || "projectViewer", decoded.projects, decoded.canExport)
         .then((role) => {
           newRole = role;
@@ -226,8 +226,15 @@ module.exports = (app) => {
   // route to delete a team member
   app.delete("/team/:id/member/:userId", verifyToken, checkPermissions("deleteAny", "teamRole"), (req, res) => {
     return teamController.getTeamRole(req.params.id, req.params.userId)
-      .then((teamRole) => {
+      .then(async (teamRole) => {
         if (!teamRole) return res.status(404).send("Did not find a team member");
+
+        const roleToDelete = await teamController.getTeamRole(req.params.id, req.params.userId);
+
+        if (roleToDelete.role === "teamOwner") {
+          return new Promise((resolve, reject) => reject("Cannot delete a team owner"));
+        }
+
         return teamController.deleteTeamMember(teamRole.id);
       })
       .then((success) => {

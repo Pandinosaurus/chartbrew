@@ -1,3 +1,5 @@
+const rateLimit = require("express-rate-limit");
+
 const ChartController = require("../controllers/ChartController");
 const ProjectController = require("../controllers/ProjectController");
 const TeamController = require("../controllers/TeamController");
@@ -5,6 +7,14 @@ const verifyToken = require("../modules/verifyToken");
 const accessControl = require("../modules/accessControl");
 const spreadsheetExport = require("../modules/spreadsheetExport");
 const alertController = require("../controllers/AlertController");
+const getEmbeddedChartData = require("../modules/getEmbeddedChartData");
+
+const apiLimiter = (max = 10) => {
+  return rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max,
+  });
+};
 
 module.exports = (app) => {
   const chartController = new ChartController();
@@ -265,7 +275,7 @@ module.exports = (app) => {
   /*
   ** Route to run the query for a chart
   */
-  app.post("/project/:project_id/chart/:id/query", verifyToken, checkPermissions("updateOwn"), (req, res) => {
+  app.post("/project/:project_id/chart/:id/query", verifyToken, checkPermissions("readOwn"), (req, res) => {
     return chartController.updateChartData(
       req.params.id,
       req.user,
@@ -295,7 +305,7 @@ module.exports = (app) => {
   /*
   ** Route to filter the charts from the dashboard
   */
-  app.post("/project/:project_id/chart/:id/filter", (req, res) => {
+  app.post("/project/:project_id/chart/:id/filter", apiLimiter(50), (req, res) => {
     if (!req.body.filters) return res.status(400).send("No filters selected");
     let noSource = req.query.no_source === "true";
     let skipParsing = req.query.skip_parsing === "true";
@@ -343,7 +353,7 @@ module.exports = (app) => {
   /*
   ** Route to get a chart for embedding (must be public for success)
   */
-  app.get("/chart/:share_string/embedded", (req, res) => {
+  app.get("/chart/:share_string/embedded", apiLimiter(50), (req, res) => {
     // backwards-compatible code for public charts with ID-enabled embed
     /* Deprecated */
     if (req.params.share_string.length < 16) {
@@ -357,22 +367,7 @@ module.exports = (app) => {
           const project = await projectController.findById(chart.project_id);
           const team = await teamController.findById(project.team_id);
 
-          return res.status(200).send({
-            id: chart.id,
-            name: chart.name,
-            type: chart.type,
-            subType: chart.subType,
-            chartDataUpdated: chart.chartDataUpdated,
-            chartData: chart.chartData,
-            ChartDatasetConfigs: chart.ChartDatasetConfigs,
-            mode: chart.mode,
-            chartSize: chart.chartSize,
-            project_id: chart.project_id,
-            showBranding: team.showBranding,
-            showGrowth: chart.showGrowth,
-            timeInterval: chart.timeInterval,
-            autoUpdate: chart.autoUpdate,
-          });
+          return res.status(200).send(getEmbeddedChartData(chart, team));
         })
         .catch((error) => {
           if (error.message === "401") {
@@ -386,7 +381,7 @@ module.exports = (app) => {
     }
 
     // New! taking advantage of the share strings
-    return chartController.findByShareString(req.params.share_string)
+    return chartController.findByShareString(req.params.share_string, req.query.snapshot)
       .then(async (chart) => {
         if (!chart.public && !chart.shareable) {
           return new Promise((resolve, reject) => reject(new Error("401")));
@@ -396,22 +391,7 @@ module.exports = (app) => {
         const project = await projectController.findById(chart.project_id);
         const team = await teamController.findById(project.team_id);
 
-        return res.status(200).send({
-          id: chart.id,
-          name: chart.name,
-          type: chart.type,
-          subType: chart.subType,
-          chartDataUpdated: chart.chartDataUpdated,
-          chartData: chart.chartData,
-          ChartDatasetConfigs: chart.ChartDatasetConfigs,
-          mode: chart.mode,
-          chartSize: chart.chartSize,
-          project_id: chart.project_id,
-          showBranding: team.showBranding,
-          showGrowth: chart.showGrowth,
-          timeInterval: chart.timeInterval,
-          autoUpdate: chart.autoUpdate,
-        });
+        return res.status(200).send(getEmbeddedChartData(chart, team));
       })
       .catch((error) => {
         if (error.message === "401") {
@@ -428,7 +408,7 @@ module.exports = (app) => {
   /*
   ** Route to get latest chart data without an authentication token
   */
-  app.get("/chart/:id", (req, res) => {
+  app.get("/chart/:id", apiLimiter(50), (req, res) => {
     // check if the chart is on a public report first
     return chartController.findById(req.params.id)
       .then(async (chart) => {
@@ -458,6 +438,7 @@ module.exports = (app) => {
           showBranding: team.showBranding,
           showGrowth: chart.showGrowth,
           timeInterval: chart.timeInterval,
+          isLogarithmic: chart.isLogarithmic,
         });
       })
       .catch((err) => {
@@ -468,7 +449,7 @@ module.exports = (app) => {
   /*
   ** Route to run the query for a chart on a project that enables this
   */
-  app.post("/chart/:id/query", (req, res) => {
+  app.post("/chart/:id/query", apiLimiter(50), (req, res) => {
     return chartController.findById(req.params.id)
       .then(async (chart) => {
         const project = await projectController.findById(chart.project_id);
@@ -524,7 +505,7 @@ module.exports = (app) => {
   /*
   ** Route used to export data from a PUBLIC dashboard
   */
-  app.post("/project/:project_id/chart/export/public/:chart_id", (req, res) => {
+  app.post("/project/:project_id/chart/export/public/:chart_id", apiLimiter(20), (req, res) => {
     return checkPublicAccess(req, "export")
       .then(() => {
         return chartController.exportChartData(null, [req.params.chart_id], req.body.filters);

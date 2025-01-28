@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Spacer,Link, Input,Checkbox, Tooltip, Button, Chip, Tabs, Tab, Divider,
-} from "@nextui-org/react";
+} from "@heroui/react";
 
 import { FaExternalLinkSquareAlt } from "react-icons/fa";
-import uuid from "uuid/v4";
+import { v4 as uuid } from "uuid";
 import AceEditor from "react-ace";
-import { LuChevronRight, LuInfo, LuPlus, LuXCircle } from "react-icons/lu";
+import { LuChevronRight, LuInfo, LuPlus, LuCircleX } from "react-icons/lu";
 
 import "ace-builds/src-min-noconflict/mode-json";
 import "ace-builds/src-min-noconflict/theme-tomorrow";
@@ -16,7 +16,7 @@ import "ace-builds/src-min-noconflict/theme-one_dark";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { useDispatch } from "react-redux";
 import { testRequest } from "../../../slices/connection";
 import { useParams } from "react-router";
@@ -39,7 +39,7 @@ function MongoConnectionForm(props) {
   const [formStyle, setFormStyle] = useState("string");
   const [testResult, setTestResult] = useState(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
 
@@ -223,7 +223,7 @@ function MongoConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-semibold">
           {!editConnection && "Connect to a MongoDB database"}
@@ -419,7 +419,7 @@ function MongoConnectionForm(props) {
                         variant="flat"
                         color="danger"
                       >
-                        <LuXCircle />
+                        <LuCircleX />
                       </Button>
                     </div>
                     <div className="md:col-span-4" />

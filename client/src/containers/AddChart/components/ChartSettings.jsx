@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Checkbox, Divider, Spacer, Input, Tooltip, Modal, Chip, ModalHeader, ModalBody, ModalFooter, ModalContent, Select, SelectItem,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import moment from "moment";
 import { DateRangePicker } from "react-date-range";
 import { enGB } from "date-fns/locale";
-import { LuCalendarDays, LuCheck, LuInfo, LuSettings, LuXCircle } from "react-icons/lu";
+import { LuCalendarDays, LuCheck, LuInfo, LuSettings, LuCircleX } from "react-icons/lu";
 
 import "react-date-range/dist/styles.css"; // main style file
 import "react-date-range/dist/theme/default.css"; // theme css file
@@ -65,7 +65,7 @@ const timeIntervalOptions = [{
   value: "year",
 }];
 
-function ChartSettings(props) {
+function ChartSettings({ chart, onChange, onComplete }) {
   const [initSelectionRange] = useState({
     startDate: moment().startOf("month").toDate(),
     endDate: moment().endOf("month").toDate(),
@@ -82,71 +82,63 @@ function ChartSettings(props) {
   const [dateFormattingModal, setDateFormattingModal] = useState(false);
   const [datesFormat, setDatesFormat] = useState(null);
 
-  const {
-    type, pointRadius, displayLegend,
-    endDate, fixedStartDate, currentEndDate, timeInterval,
-    includeZeros, startDate, onChange, onComplete,
-    maxValue, minValue, xLabelTicks, stacked, dateVarsFormat, horizontal,
-    dataLabels,
-  } = props;
-
   useEffect(() => {
-    if (startDate) {
+    if (chart.startDate) {
       _onViewRange(true, true);
     }
   }, []);
 
   useEffect(() => {
-    if (maxValue || maxValue === 0) {
-      setMax(maxValue);
+    if (chart.maxValue || chart.maxValue === 0) {
+      setMax(chart.maxValue);
     }
-    if (maxValue === null) {
+    if (chart.maxValue === null) {
       setMax("");
     }
-    if (minValue || minValue === 0) {
-      setMin(minValue);
+    if (chart.minValue || chart.minValue === 0) {
+      setMin(chart.minValue);
     }
-    if (minValue === null) {
+    if (chart.minValue === null) {
       setMin("");
     }
-  }, [maxValue, minValue]);
+  }, [chart.maxValue, chart.minValue]);
 
   useEffect(() => {
-    setDateRange({ startDate, endDate });
-    if (dateVarsFormat) {
-      setDatesFormat(dateVarsFormat);
+    setDateRange({ startDate: chart.startDate, endDate: chart.endDate });
+    if (chart.dateVarsFormat) {
+      setDatesFormat(chart.dateVarsFormat);
     }
-  }, [startDate, endDate]);
+  }, [chart.startDate, chart.endDate]);
 
   useEffect(() => {
-    if (!xLabelTicks || xLabelTicks === "default") {
+    if (!chart.xLabelTicks || chart.xLabelTicks === "default") {
       setTicksSelection("default");
-    } else if (xLabelTicks !== "showAll" && xLabelTicks !== "half" && xLabelTicks !== "third" && xLabelTicks !== "fourth") {
+    } else if (chart.xLabelTicks !== "showAll" && chart.xLabelTicks !== "half" && chart.xLabelTicks !== "third" && chart.xLabelTicks !== "fourth") {
       setTicksSelection("custom");
-      setTicksNumber(xLabelTicks);
+      setTicksNumber(chart.xLabelTicks);
     } else {
-      setTicksSelection(xLabelTicks);
+      setTicksSelection(chart.xLabelTicks);
     }
-  }, [xLabelTicks]);
+  }, [chart.xLabelTicks]);
 
   useEffect(() => {
-    if (startDate && endDate) {
-      let newStartDate = moment(startDate);
-      let newEndDate = moment(endDate);
+    if (chart.startDate && chart.endDate) {
+      let newStartDate = moment(chart.startDate);
+      let newEndDate = moment(chart.endDate);
 
-      if (currentEndDate) {
-        const timeDiff = newEndDate.diff(newStartDate, timeInterval);
-        newEndDate = moment().utcOffset(0, true).endOf(timeInterval);
+      if (chart.currentEndDate) {
+        const timeDiff = newEndDate.diff(newStartDate, chart.timeInterval);
+        newEndDate = moment().utcOffset(0, true).endOf(chart.timeInterval);
 
-        if (!fixedStartDate) {
-          newStartDate = newEndDate.clone().subtract(timeDiff, timeInterval).startOf(timeInterval);
+        if (!chart.fixedStartDate) {
+          newStartDate = newEndDate.clone().subtract(timeDiff, chart.timeInterval).startOf(chart.timeInterval);
         }
       }
 
       setLabelStartDate(newStartDate.format("ll"));
       setLabelEndDate(newEndDate.format("ll"));
     }
-  }, [currentEndDate, dateRange, fixedStartDate]);
+  }, [chart.currentEndDate, dateRange, chart.fixedStartDate]);
 
   const _onViewRange = (value, init) => {
     if (!value) {
@@ -170,11 +162,11 @@ function ChartSettings(props) {
   };
 
   const _onChangeStacked = () => {
-    onChange({ stacked: !stacked });
+    onChange({ stacked: !chart.stacked });
   };
 
   const _onChangeHorizontal = () => {
-    onChange({ horizontal: !horizontal });
+    onChange({ horizontal: !chart.horizontal });
   };
 
   const _onChangeDateRange = (range) => {
@@ -225,7 +217,7 @@ function ChartSettings(props) {
       <Spacer y={4} />
 
       <Row>
-        <Text>Global date settings</Text>
+        <Text>Date settings</Text>
       </Row>
       <Spacer y={1} />
       <div className="grid grid-cols-12 gap-2 justify-between">
@@ -239,25 +231,25 @@ function ChartSettings(props) {
             >
               Date filter
             </Button>
-            {(startDate || endDate) && (
+            {(chart.startDate || chart.endDate) && (
               <Tooltip content="Remove date filtering">
                 <Button
                   variant="light"
                   isIconOnly
                   color="danger"
-                  onClick={() => _onRemoveDateFiltering()}
+                  onPress={() => _onRemoveDateFiltering()}
                   size="sm"
                 >
-                  <LuXCircle />
+                  <LuCircleX />
                 </Button>
               </Tooltip>
             )}
-            {startDate && endDate && (
+            {chart.startDate && chart.endDate && (
               <Tooltip content="Date formatting">
                 <Button
                   variant="light"
                   isIconOnly
-                  onClick={() => setDateFormattingModal(true)}
+                  onPress={() => setDateFormattingModal(true)}
                   size="sm"
                 >
                   <LuSettings />
@@ -267,13 +259,13 @@ function ChartSettings(props) {
           </Row>
           <Spacer y={1} />
           <Row className={"gap-1"} align="center">
-            {startDate && (
+            {chart.startDate && (
               <Chip variant="faded" color="secondary" size="sm" onClick={() => setDateRangeModal(true)}>
                 <Text className={"text-foreground"}>{labelStartDate}</Text>
               </Chip>
             )}
-            {startDate && (<span>-</span>)}
-            {endDate && (
+            {chart.startDate && (<span>-</span>)}
+            {chart.endDate && (
               <Chip variant="faded" color="secondary" size="sm" onClick={() => setDateRangeModal(true)}>
                 <Text className="text-foreground">
                   {labelEndDate}
@@ -283,60 +275,59 @@ function ChartSettings(props) {
           </Row>
         </div>
         <div className="col-span-12 lg:col-span-6">
-          <Checkbox
-            isSelected={currentEndDate}
-            isDisabled={!dateRange.endDate}
-            onChange={() => {
-              onChange({ currentEndDate: !currentEndDate });
-            }}
-            size="sm"
-            className="chart-settings-relative"
-          >
-            <Row align={"center"}>
+          <div className="flex flex-row items-center gap-2">
+            <Checkbox
+              isSelected={chart.currentEndDate}
+              isDisabled={!dateRange.endDate}
+              onChange={() => {
+                onChange({ currentEndDate: !chart.currentEndDate });
+              }}
+              size="sm"
+              className="chart-settings-relative"
+            >
               Auto-update the date range
-              <Spacer x={1} />
-              <Tooltip
-                content={(
-                  <div style={{ padding: 5 }}>
-                    <Text>
-                      {"When this is enabled, the end date will be automatically updated to the current date and the date range length will be preserved."}
-                    </Text>
-                    <Spacer y={0.6} />
-                    <Text>
-                      {"This option takes into account the date interval as well."}
-                    </Text>
-                    <Spacer y={0.6} />
-                    <ul>
-                      <li>
-                        <Text b>
-                          {"Daily interval: the end date will be the end of the present day"}
-                        </Text>
-                      </li>
-                      <li>
-                        <Text b>
-                          {"Weekly interval: the end date will be the end of the present week"}
-                        </Text>
-                      </li>
-                      <li>
-                        <Text b>
-                          {"Monthly interval: the end date will be the end of the present month"}
-                        </Text>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              >
-                <div>
-                  <LuInfo />
+            </Checkbox>
+            <Tooltip
+              content={(
+                <div style={{ padding: 5 }}>
+                  <Text>
+                    {"When this is enabled, the date range will be preserved but shifted to the present date."}
+                  </Text>
+                  <Spacer y={1} />
+                  <Text>
+                    {"This option takes into account the date interval as well."}
+                  </Text>
+                  <Spacer y={2} />
+                  <ul>
+                    <li>
+                      <Text b>
+                        {"Daily interval: the end date will be the end of the present day"}
+                      </Text>
+                    </li>
+                    <li>
+                      <Text b>
+                        {"Weekly interval: the end date will be the end of the present week"}
+                      </Text>
+                    </li>
+                    <li>
+                      <Text b>
+                        {"Monthly interval: the end date will be the end of the present month"}
+                      </Text>
+                    </li>
+                  </ul>
                 </div>
-              </Tooltip>
-            </Row>
-          </Checkbox>
+              )}
+            >
+              <div>
+                <LuInfo />
+              </div>
+            </Tooltip>
+          </div>
           <Spacer y={1} />
           <Checkbox
-            isSelected={fixedStartDate}
-            isDisabled={!currentEndDate}
-            onChange={(selected) => {
+            isSelected={chart.fixedStartDate}
+            isDisabled={!chart.currentEndDate}
+            onValueChange={(selected) => {
               onChange({ fixedStartDate: selected });
             }}
             size="sm"
@@ -353,16 +344,17 @@ function ChartSettings(props) {
             placeholder="Select a time interval"
             label="Time interval"
             size="sm"
-            selectedKeys={[timeInterval]}
+            selectedKeys={[chart.timeInterval]}
             onSelectionChange={(keys) => onChange({ timeInterval: keys.currentKey })}
             variant="bordered"
             renderValue={() => (
-              <Text>{timeIntervalOptions.find((option) => option.value === timeInterval).text}</Text>
+              <Text>{timeIntervalOptions.find((option) => option.value === chart.timeInterval).text}</Text>
             )}
             className="chart-settings-interval"
+            aria-label="Select a time interval"
           >
             {timeIntervalOptions.map((option) => (
-              <SelectItem key={option.value}>
+              <SelectItem key={option.value} textValue={option.text}>
                 {option.text}
               </SelectItem>
             ))}
@@ -370,8 +362,8 @@ function ChartSettings(props) {
         </div>
         <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6 flex items-center">
           <Checkbox
-            isSelected={includeZeros}
-            onChange={() => onChange({ includeZeros: !includeZeros })}
+            isSelected={chart.includeZeros}
+            onChange={() => onChange({ includeZeros: !chart.includeZeros })}
             size="sm"
           >
             Allow zero values
@@ -383,13 +375,13 @@ function ChartSettings(props) {
       <Divider />
       <Spacer y={4} />
 
-      <div className="grid grid-cols-12 gap-2">          
-        {type === "line" && (
-          <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {chart.type === "line" && (
+          <div>
             <Checkbox
-              isSelected={pointRadius > 0}
+              isSelected={chart.pointRadius > 0}
               onChange={() => {
-                if (pointRadius > 0) {
+                if (chart.pointRadius > 0) {
                   _onAddPoints(0);
                 } else {
                   _onAddPoints(3);
@@ -401,10 +393,10 @@ function ChartSettings(props) {
             </Checkbox>
           </div>
         )}
-        {type === "bar" && (
-          <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+        {chart.type === "bar" && (
+          <div>
             <Checkbox
-              isSelected={stacked}
+              isSelected={chart.stacked}
               onChange={_onChangeStacked}
               size="sm"
             >
@@ -412,10 +404,10 @@ function ChartSettings(props) {
             </Checkbox>
           </div>
         )}
-        {type === "bar" && (
-          <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+        {chart.type === "bar" && (
+          <div>
             <Checkbox
-              isSelected={horizontal}
+              isSelected={chart.horizontal}
               onChange={_onChangeHorizontal}
               size="sm"
             >
@@ -423,32 +415,43 @@ function ChartSettings(props) {
             </Checkbox>
           </div>
         )}
-        <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+        <div>
           <Checkbox
-            isSelected={displayLegend}
-            onChange={() => onChange({ displayLegend: !displayLegend })}
+            isSelected={chart.displayLegend}
+            onChange={() => onChange({ displayLegend: !chart.displayLegend })}
             size="sm"
           >
             Legend
           </Checkbox>
         </div>
-        <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+        <div>
           <Checkbox
-            isSelected={dataLabels}
-            onChange={() => onChange({ dataLabels: !dataLabels })}
+            isSelected={chart.dataLabels}
+            onChange={() => onChange({ dataLabels: !chart.dataLabels })}
             size="sm"
           >
             Data labels
           </Checkbox>
         </div>
+        {(chart.type === "line" || chart.type === "bar") && (
+          <div>
+            <Checkbox
+              isSelected={chart.isLogarithmic}
+              onValueChange={(selected) => onChange({ isLogarithmic: selected })}
+              size="sm"
+            >
+              Logarithmic scale
+            </Checkbox>
+          </div>
+        )}
       </div>
 
       <Spacer y={4} />
       <Divider />
       <Spacer y={4} />
 
-      <div className="grid grid-cols-12 gap-2">
-        <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-row items-center gap-2">
           <Input
             label="Max Y Axis value"
             placeholder="Enter a number"
@@ -458,35 +461,34 @@ function ChartSettings(props) {
             variant="bordered"
             fullWidth
           />
+          <div className="flex flex-row gap-1">
+            {max && (
+              <>
+                <Button
+                  disabled={!max || (max === chart.maxValue)}
+                  onPress={() => onChange({ maxValue: max })}
+                  color="success"
+                  variant="flat"
+                  size="sm"
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="flat"
+                  color="danger"
+                  onPress={() => {
+                    onChange({ maxValue: null });
+                    setMax("");
+                  }}
+                  size="sm"
+                >
+                  Clear
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6 flex items-end justify-center">
-          {max && (
-            <>
-              <Button
-                disabled={!max || (max === maxValue)}
-                onClick={() => onChange({ maxValue: max })}
-                color="success"
-                variant="flat"
-                auto
-              >
-                Save
-              </Button>
-              <Spacer x={0.3} />
-              <Button
-                variant="flat"
-                color="danger"
-                onClick={() => {
-                  onChange({ maxValue: null });
-                  setMax("");
-                }}
-                auto
-              >
-                Clear
-              </Button>
-            </>
-          )}
-        </div>
-        <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6">
+        <div className="flex flex-row items-center gap-2">
           <Input
             label="Min Y Axis value"
             placeholder="Enter a number"
@@ -496,33 +498,32 @@ function ChartSettings(props) {
             variant="bordered"
             fullWidth
           />
-        </div>
-        <div className="col-span-6 sm:col-span-12 md:col-span-6 lg:col-span-6 flex items-end justify-center">
-          {min && (
-            <>
-              <Button
-                disabled={!min || (min === minValue)}
-                onClick={() => onChange({ minValue: min })}
-                color="success"
-                auto
-                variant="flat"
-              >
-                Save
-              </Button>
-              <Spacer x={0.3} />
-              <Button
-                variant="flat"
-                color="danger"
-                onClick={() => {
-                  onChange({ minValue: null });
-                  setMin("");
-                }}
-                auto
-              >
-                Clear
-              </Button>
-            </>
-          )}
+          <div className="flex flex-row gap-1">
+            {min && (
+              <>
+                <Button
+                  disabled={!min || (min === chart.minValue)}
+                  onPress={() => onChange({ minValue: min })}
+                  color="success"
+                  variant="flat"
+                  size="sm"
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="flat"
+                  color="danger"
+                  onPress={() => {
+                    onChange({ minValue: null });
+                    setMin("");
+                  }}
+                  size="sm"
+                >
+                  Clear
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -543,9 +544,10 @@ function ChartSettings(props) {
             renderValue={() => (
               <Text>{xLabelOptions.find((option) => option.value === ticksSelection).text}</Text>
             )}
+            aria-label="Select the number of labels"
           >
             {xLabelOptions.map((option) => (
-              <SelectItem key={option.value}>
+              <SelectItem key={option.value} textValue={option.text}>
                 {option.text}
               </SelectItem>
             ))}
@@ -569,7 +571,7 @@ function ChartSettings(props) {
                 <Button
                   variant="flat"
                   color="success"
-                  onClick={() => _onConfirmTicksNumber()}
+                  onPress={() => _onConfirmTicksNumber()}
                   auto
                 >
                   Save
@@ -591,7 +593,7 @@ function ChartSettings(props) {
           </ModalHeader>
           <ModalBody>
             <div>
-              {currentEndDate && (
+              {chart.currentEndDate && (
                 <>
                   <Text>
                     {"The date range is set to auto-update to the current date. If you want to set an exact custom date range, disable the auto-update option."}
@@ -620,15 +622,14 @@ function ChartSettings(props) {
           </ModalBody>
           <ModalFooter>
             <Button
-              variant="flat"
-              color="warning"
-              onClick={() => setDateRangeModal(false)}
+              variant="bordered"
+              onPress={() => setDateRangeModal(false)}
             >
               Cancel
             </Button>
             <Button
               endContent={<LuCheck />}
-              onClick={_onComplete}
+              onPress={_onComplete}
               color="primary"
             >
               Apply date filter
@@ -659,7 +660,7 @@ function ChartSettings(props) {
             <Row>
               <Input
                 label="Enter a date format"
-                initialValue={dateVarsFormat}
+                initialValue={chart.dateVarsFormat}
                 value={datesFormat}
                 onChange={(e) => setDatesFormat(e.target.value)}
                 variant="bordered"
@@ -671,7 +672,7 @@ function ChartSettings(props) {
               <Button
                 color="primary"
                 size="sm"
-                onClick={() => setDatesFormat("YYYY-MM-DD")}
+                onPress={() => setDatesFormat("YYYY-MM-DD")}
                 variant="bordered"
               >
                 {"YYYY-MM-DD"}
@@ -680,7 +681,7 @@ function ChartSettings(props) {
               <Button
                 color="primary"
                 size="sm"
-                onClick={() => setDatesFormat("YYYY-MM-DD HH:mm:ss")}
+                onPress={() => setDatesFormat("YYYY-MM-DD HH:mm:ss")}
                 variant="bordered"
               >
                 {"YYYY-MM-DD HH:mm:ss"}
@@ -689,7 +690,7 @@ function ChartSettings(props) {
               <Button
                 color="primary"
                 size="sm"
-                onClick={() => setDatesFormat("X")}
+                onPress={() => setDatesFormat("X")}
                 variant="bordered"
               >
                 {"Timestamp (in seconds)"}
@@ -698,7 +699,7 @@ function ChartSettings(props) {
               <Button
                 color="primary"
                 size="sm"
-                onClick={() => setDatesFormat("x")}
+                onPress={() => setDatesFormat("x")}
                 variant="bordered"
               >
                 {"Timestamp (in ms)"}
@@ -721,15 +722,14 @@ function ChartSettings(props) {
           </ModalBody>
           <ModalFooter>
             <Button
-              variant="flat"
-              color="warning"
-              onClick={() => setDateFormattingModal(false)}
+              variant="bordered"
+              onPress={() => setDateFormattingModal(false)}
             >
               Cancel
             </Button>
             <Button
               endContent={<LuCheck />}
-              onClick={_onChangeDateFormat}
+              onPress={_onChangeDateFormat}
               color="primary"
             >
               Apply date format
@@ -741,45 +741,10 @@ function ChartSettings(props) {
   );
 }
 
-ChartSettings.defaultProps = {
-  displayLegend: false,
-  pointRadius: 0,
-  startDate: null,
-  endDate: null,
-  includeZeros: true,
-  currentEndDate: false,
-  fixedStartDate: false,
-  timeInterval: "day",
-  onChange: () => { },
-  onComplete: () => { },
-  maxValue: null,
-  minValue: null,
-  xLabelTicks: "",
-  stacked: false,
-  horizontal: false,
-  dateVarsFormat: "",
-  dataLabels: false,
-};
-
 ChartSettings.propTypes = {
-  type: PropTypes.string.isRequired,
-  displayLegend: PropTypes.bool,
-  pointRadius: PropTypes.number,
-  startDate: PropTypes.object,
-  endDate: PropTypes.object,
-  includeZeros: PropTypes.bool,
-  currentEndDate: PropTypes.bool,
-  fixedStartDate: PropTypes.bool,
-  timeInterval: PropTypes.string,
-  onChange: PropTypes.func,
-  onComplete: PropTypes.func,
-  maxValue: PropTypes.number,
-  minValue: PropTypes.number,
-  xLabelTicks: PropTypes.number,
-  stacked: PropTypes.bool,
-  horizontal: PropTypes.bool,
-  dateVarsFormat: PropTypes.string,
-  dataLabels: PropTypes.bool,
+  chart: PropTypes.object.isRequired,
+  onChange: PropTypes.func.isRequired,
+  onComplete: PropTypes.func.isRequired,
 };
 
 export default ChartSettings;

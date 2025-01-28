@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Checkbox, Select, SelectItem, Spacer,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import _ from "lodash";
 import cookie from "react-cookies";
 import { LuArrowLeft, LuArrowRight, LuCheckCheck, LuPlus, LuX } from "react-icons/lu";
@@ -320,9 +320,10 @@ function GaTemplate(props) {
               selectionMode="single"
               variant="bordered"
               fullWidth
+              aria-label="Select a connection"
             >
               {availableConnections.map((connection) => (
-                <SelectItem key={connection.key}>
+                <SelectItem key={connection.key} textValue={connection.text}>
                   {connection.text}
                 </SelectItem>
               ))}
@@ -351,9 +352,10 @@ function GaTemplate(props) {
                     selectedKeys={[configuration.accountId]}
                     onSelectionChange={(keys) => _onAccountSelected(keys.currentKey)}
                     selectionMode="single"
+                    aria-label="Select an account"
                   >
                     {accountOptions.map((option) => (
-                      <SelectItem key={option.key}>
+                      <SelectItem key={option.key} textValue={option.text}>
                         {option.text}
                       </SelectItem>
                     ))}
@@ -369,9 +371,10 @@ function GaTemplate(props) {
                     selectedKeys={[configuration.propertyId]}
                     onSelectionChange={(keys) => _onPropertySelected(keys.currentKey)}
                     selectionMode="single"
+                    aria-label="Select a property"
                   >
                     {propertyOptions.map((option) => (
-                      <SelectItem key={option.key}>
+                      <SelectItem key={option.key} textValue={option.text}>
                         {option.text}
                       </SelectItem>
                     ))}

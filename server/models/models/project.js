@@ -65,6 +65,26 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    updateSchedule: {
+      type: DataTypes.TEXT,
+      set(value) {
+        try {
+          this.setDataValue("updateSchedule", JSON.stringify(value));
+        } catch (error) {
+          this.setDataValue("updateSchedule", "{}");
+        }
+      },
+      get() {
+        try {
+          return JSON.parse(this.getDataValue("updateSchedule"));
+        } catch (error) {
+          return {};
+        }
+      },
+    },
+    lastUpdatedAt: {
+      type: DataTypes.DATE,
+    },
   }, {
     freezeTableName: true,
   });
@@ -72,6 +92,7 @@ module.exports = (sequelize, DataTypes) => {
   Project.associate = (models) => {
     models.Project.hasMany(models.ProjectRole, { foreignKey: "project_id" });
     models.Project.hasMany(models.Chart, { foreignKey: "project_id" });
+    models.Project.hasMany(models.Variable, { foreignKey: "project_id" });
     models.Project.belongsTo(models.Team, { foreignKey: "team_id" });
   };
 

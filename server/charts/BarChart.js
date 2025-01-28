@@ -128,8 +128,10 @@ class NewBarChart {
           },
           grid: {
             display: !this.chart.horizontal,
-            drawBorder: this.chart.mode !== "kpichart",
             lineWidth: 0.5,
+          },
+          border: {
+            display: this.chart.mode !== "kpichart",
           },
         },
         x: {
@@ -144,8 +146,10 @@ class NewBarChart {
           },
           grid: {
             display: this.chart.mode !== "kpichart" || this.chart.horizontal,
-            drawBorder: this.chart.mode !== "kpichart" || this.chart.horizontal,
             lineWidth: 0.5,
+          },
+          border: {
+            display: this.chart.mode !== "kpichart" || this.chart.horizontal,
           },
         },
       },
@@ -174,6 +178,9 @@ class NewBarChart {
     }
     if (this.chart.minValue) {
       chartJsData.options.scales.y.min = this.chart.minValue;
+    }
+    if (this.chart.isLogarithmic) {
+      chartJsData.options.scales.y.type = "logarithmic";
     }
 
     // check how many ticks should the X Axis have

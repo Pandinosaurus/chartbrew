@@ -110,9 +110,11 @@ class NewLineChart {
           },
           grid: {
             display: true,
-            drawBorder: this.chart.mode !== "kpichart",
             lineWidth: 0.5,
           },
+          border: {
+            display: this.chart.mode !== "kpichart",
+          }
         },
         x: {
           ticks: {
@@ -126,9 +128,11 @@ class NewLineChart {
           },
           grid: {
             display: this.chart.mode !== "kpichart",
-            drawBorder: this.chart.mode !== "kpichart",
             lineWidth: 0.5,
           },
+          border: {
+            display: this.chart.mode !== "kpichart",
+          }
         },
       },
       plugins: {
@@ -156,6 +160,9 @@ class NewLineChart {
     }
     if (this.chart.minValue) {
       chartJsData.options.scales.y.min = this.chart.minValue;
+    }
+    if (this.chart.isLogarithmic) {
+      chartJsData.options.scales.y.type = "logarithmic";
     }
 
     // check how many ticks should the X Axis have

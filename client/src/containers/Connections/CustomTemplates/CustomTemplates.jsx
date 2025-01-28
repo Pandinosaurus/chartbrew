@@ -1,26 +1,30 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
-import { connect } from "react-redux";
 import {
   Button, Card, Spacer, CircularProgress, CardHeader, CardBody, CardFooter, Divider,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import moment from "moment";
-import { LuBarChart3 } from "react-icons/lu";
+import { LuChartColumn } from "react-icons/lu";
+import { useDispatch, useSelector } from "react-redux";
 
 import CreateTemplateForm from "../../../components/CreateTemplateForm";
 import CustomTemplateForm from "./CustomTemplateForm";
-import { deleteTemplate as deleteTemplateAction } from "../../../actions/template";
+import { deleteTemplate, selectTemplates } from "../../../slices/template";
 import Text from "../../../components/Text";
 import Row from "../../../components/Row";
 
 function CustomTemplates(props) {
   const {
-    loading, templates, teamId, projectId, onComplete, isAdmin, deleteTemplate,
+    teamId, projectId, onComplete, isAdmin,
     onCreateProject,
   } = props;
 
   const [createTemplate, setCreateTemplate] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+
+  const dispatch = useDispatch();
+  const templates = useSelector(selectTemplates);
+  const loading = useSelector((state) => state.template.loading);
 
   const _getUpdatedTime = (updatedAt) => {
     if (moment().diff(moment(updatedAt), "hours") < 24) {
@@ -31,7 +35,10 @@ function CustomTemplates(props) {
   };
 
   const _onDelete = (templateId) => {
-    return deleteTemplate(teamId, templateId)
+    return dispatch(deleteTemplate({
+      team_id: teamId,
+      template_id: templateId
+    }))
       .then(() => setSelectedTemplate(null));
   };
 
@@ -96,16 +103,16 @@ function CustomTemplates(props) {
             onClick={() => setSelectedTemplate(template)}
             isHoverable
             isPressable
-            className="w-[230px] border-1 border-solid border-content3"
+            className="w-[230px] border-1 border-solid border-content3 h-full"
             shadow="none"
           >
             <CardHeader>
               <Text b>{template.name}</Text>
             </CardHeader>
             <Divider />
-            <CardBody>
+            <CardBody className="flex flex-col align-middle justify-center">
               <Row>
-                <LuBarChart3 />
+                <LuChartColumn />
                 <Spacer x={0.5} />
                 <Text>{`${template.model.Charts.length} charts`}</Text>
               </Row>
@@ -127,7 +134,6 @@ CustomTemplates.propTypes = {
   teamId: PropTypes.string.isRequired,
   projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onComplete: PropTypes.func.isRequired,
-  deleteTemplate: PropTypes.func.isRequired,
   isAdmin: PropTypes.bool,
   onCreateProject: PropTypes.func,
 };
@@ -139,11 +145,4 @@ CustomTemplates.defaultProps = {
   onCreateProject: () => {},
 };
 
-const mapStateToProps = () => ({});
-const mapDispatchToProps = (dispatch) => {
-  return {
-    deleteTemplate: (teamId, templateId) => dispatch(deleteTemplateAction(teamId, templateId)),
-  };
-};
-
-export default connect(mapStateToProps, mapDispatchToProps)(CustomTemplates);
+export default CustomTemplates;

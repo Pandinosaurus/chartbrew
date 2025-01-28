@@ -3,7 +3,7 @@ import { connect } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Spacer, Button, CircularProgress,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import cookie from "react-cookies";
 import { LuArrowRight } from "react-icons/lu";
 
@@ -80,7 +80,7 @@ function GoogleAuth() {
     >
       {loading && (
         <Row>
-          <CircularProgress>Authenticating with Google...</CircularProgress>
+          <CircularProgress aria-label="Authenticating with Google">Authenticating with Google...</CircularProgress>
         </Row>
       )}
 
@@ -93,7 +93,7 @@ function GoogleAuth() {
           </Row>
           <Spacer y={1} />
           <Row>
-            <Link to="/user">
+            <Link to="/connections">
               <Button
                 color="success"
                 endContent={<LuArrowRight />}
@@ -119,7 +119,7 @@ function GoogleAuth() {
           </Row>
           <Spacer y={1} />
           <Row>
-            <Link to="/user">
+            <Link to="/connections">
               <Button
                 color="secondary"
                 endContent={<LuArrowRight />}

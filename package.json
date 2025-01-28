@@ -1,17 +1,15 @@
 {
   "name": "chartbrew",
-  "version": "v3.1.0",
+  "version": "v3.11.1",
   "description": "",
   "main": "index.js",
   "workspaces": [],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "setup": "npm run prepareSettings && npm install && cd client && npm install && cd ../server/ && npm install",
+    "setup": "npm run prepareSettings && npm install && cd client && npm install && cd ../server/ && npm install && npx playwright install",
     "prepareSettings": "echo n | cp -vipr .env-template .env | true && cd client && echo n | cp -vipr src/config/settings.template.js src/config/settings.js | true",
     "client": "cd client && npm start",
-    "server": "cd server && npm run start-dev",
-    "docs:dev": "vuepress dev docs",
-    "docs:build": "vuepress build docs"
+    "server": "cd server && npm run start-dev"
   },
   "repository": {
     "type": "git",

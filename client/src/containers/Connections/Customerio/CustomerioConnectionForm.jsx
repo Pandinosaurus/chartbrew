@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Input, Link, Spacer, Chip, Accordion, AccordionItem, Select, SelectItem, Divider,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import "ace-builds/src-min-noconflict/mode-json";
 import "ace-builds/src-min-noconflict/theme-tomorrow";
 import "ace-builds/src-min-noconflict/theme-one_dark";
 import { LuExternalLink, LuInfo } from "react-icons/lu";
+import { useDispatch } from "react-redux";
+import { useParams } from "react-router";
 
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
-import { useDispatch } from "react-redux";
-import { useParams } from "react-router";
+import { useTheme } from "../../../modules/ThemeContext";
 import { testRequest } from "../../../slices/connection";
 
 /*
@@ -35,9 +35,10 @@ function CustomerioConnectionForm(props) {
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
+  const initRef = useRef(null);
 
   const regionOptions = [
     {
@@ -49,12 +50,9 @@ function CustomerioConnectionForm(props) {
   ];
 
   useEffect(() => {
-    _init();
-  }, []);
-
-  useEffect(() => {
-    if (editConnection) {
-      setConnection(editConnection);
+    if (!initRef.current && editConnection?.id) {
+      initRef.current = true;
+      _init();
     }
   }, [editConnection]);
 
@@ -80,7 +78,7 @@ function CustomerioConnectionForm(props) {
 
   const _init = () => {
     if (editConnection) {
-      const newConnection = editConnection;
+      const newConnection = { ...editConnection };
 
       setConnection(newConnection);
     }
@@ -108,20 +106,18 @@ function CustomerioConnectionForm(props) {
       return;
     }
 
-    setTimeout(() => {
-      const newConnection = connection;
-      if (test === true) {
-        setTestLoading(true);
-        _onTestRequest(newConnection)
-          .then(() => setTestLoading(false))
-          .catch(() => setTestLoading(false));
-      } else {
-        setLoading(true);
-        onComplete(newConnection)
-          .then(() => setLoading(false))
-          .catch(() => setLoading(false));
-      }
-    }, 100);
+    const newConnection = { ...connection };
+    if (test === true) {
+      setTestLoading(true);
+      _onTestRequest(newConnection)
+        .then(() => setTestLoading(false))
+        .catch(() => setTestLoading(false));
+    } else {
+      setLoading(true);
+      onComplete(newConnection)
+        .then(() => setLoading(false))
+        .catch(() => setLoading(false));
+    }
   };
 
   const _getRegionText = (region) => {
@@ -130,7 +126,7 @@ function CustomerioConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-semibold">
           {!editConnection && "Connect to Customer.io"}
@@ -141,11 +137,11 @@ function CustomerioConnectionForm(props) {
           <Input
             label="Name your connection"
             placeholder="Enter a name that you can recognise later"
-            value={connection.name || ""}
+            value={connection.name}
             onChange={(e) => {
               setConnection({ ...connection, name: e.target.value });
             }}
-            color={errors.name ? "danger" : "primary"}
+            color={errors.name ? "danger" : "default"}
             description={errors.name}
             variant="bordered"
             fullWidth
@@ -158,11 +154,11 @@ function CustomerioConnectionForm(props) {
             type="password"
             label="Your Customer.io API key"
             placeholder="Enter your Customer.io API key"
-            value={connection.password || ""}
+            value={connection.password}
             onChange={(e) => {
               setConnection({ ...connection, password: e.target.value });
             }}
-            color={errors.password ? "danger" : "primary"}
+            color={errors.password ? "danger" : "default"}
             description={errors.password}
             variant="bordered"
             fullWidth
@@ -204,10 +200,17 @@ function CustomerioConnectionForm(props) {
             value={_getRegionText(connection.host)}
             selectedKeys={[connection.host]}
             selectionMode="single"
-            onSelectionChange={(key) => setConnection({ ...connection, host: key })}
+            onSelectionChange={(keys) => setConnection({ ...connection, host: keys.currentKey })}
+            renderValue={(items) => (
+              <div className="flex items-center gap-1">
+                <span>{regionOptions.find((r) => r.key === items[0].key).flag === "eu" ? "🇪🇺" : "🇺🇸"}</span>
+                <span>{items[0].textValue}</span>
+              </div>
+            )}
+            aria-label="Select a region"
           >
             {regionOptions.map((option) => (
-              <SelectItem key={option.value}>
+              <SelectItem key={option.value} startContent={option.flag === "eu" ? "🇪🇺" : "🇺🇸"} textValue={option.text}>
                 {option.text}
               </SelectItem>
             ))}

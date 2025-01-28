@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import {
   Chip, Button, Divider, Input, Popover, Spacer, Switch, Tooltip, Select,
   SelectItem, Tabs, Tab, PopoverTrigger, PopoverContent,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import {
   format, getUnixTime, subDays, endOfDay, startOfDay
 } from "date-fns";
@@ -81,7 +81,7 @@ function CampaignsQuery(props) {
             key: campaign.id,
             label: {
               content: campaign.active ? "Running" : "Stopped",
-              color: campaign.active ? "success" : "error",
+              color: campaign.active ? "success" : "danger",
             },
           };
         });
@@ -345,12 +345,13 @@ function CampaignsQuery(props) {
           selectedKeys={[config.campaignId]}
           selectionMode="single"
           isLoading={loading}
+          aria-label="Select a campaign"
         >
           {campaigns.map((campaign) => (
             <SelectItem
               key={campaign.key}
               startContent={(
-                <Chip color={campaign.label.color} className="min-w-[70px]">
+                <Chip color={campaign.label.color} size="sm" className="min-w-[70px] text-center" variant="flat">
                   {campaign.label.content}
                 </Chip>
               )}
@@ -392,6 +393,7 @@ function CampaignsQuery(props) {
             onSelectionChange={(keys) => _onSelectAction(keys.currentKey)}
             selectedKeys={[config.actionId]}
             selectionMode="single"
+            aria-label="Select an action"
           >
             {availableActions.map((action) => (
               <SelectItem key={action.key} textValue={action.text}>
@@ -437,6 +439,7 @@ function CampaignsQuery(props) {
                   {`Show ${config.requestRoute.indexOf("actions") > -1 ? "action" : "campaign"} link metrics`}
                 </Chip>
               </Row>
+              <Spacer y={2} />
             </>
           )}
         </>
@@ -449,81 +452,77 @@ function CampaignsQuery(props) {
         && (
         <>
           <Spacer y={2} />
-          <Row>
-            <div className="grid grid-cols-12 gap-2">
-              <div className={`col-span-12 md:col-span-${(config.series || config.actionId) ? 4 : 6}`}>
-                <Select
-                  variant="bordered"
-                  label="Choose the period"
-                  onSelectionChange={(keys) => _onChangePeriod(keys.currentKey)}
-                  selectedKeys={[config.period]}
-                  selectionMode="single"
-                >
-                  {periodOptions.map((period) => (
-                    <SelectItem key={period.key} textValue={period.text}>
-                      {period.text}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-              <div className={`col-span-12 md:col-span-${(config.series || config.actionId) ? 4 : 6}`}>
-                <Select
-                  variant="bordered"
-                  label="Max number of steps"
-                  onSelectionChange={(keys) => _onChangeSteps(keys.currentKey)}
-                  selectedKeys={[config.steps]}
-                  selectionMode="single"
-                >
-                  {stepsOptions.map((steps) => (
-                    <SelectItem key={steps.key} textValue={steps.text}>
-                      {steps.text}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              {(config.series || config.actionId) && (
-                <div className="col-span-12 md:col-span-4 flex justify-center">
-                  <Text>Leave empty for *all* types</Text>
-                  <Select
-                    variant="bordered"
-                    label="Message types"
-                    renderValue={(items) => (
-                      <div className="flex flex-wrap gap-2">
-                        {items.map((item) => (
-                          <Chip key={item}>
-                            {config.type && config.type.find((t) => t === item)?.text}
-                          </Chip>
-                        ))}
-                      </div>
-                    )}
-                    onSelectionChange={(keys) => {
-                      // add to the list if not already in it
-                      if (!config.type || !config.type.includes(keys.currentKey)) {
-                        _onChangeMessageTypes(!config.type ? [keys.currentKey] : [...config.type, keys.currentKey]);
-                      } else {
-                        setConfig({ ...config, type: config.type.filter((t) => t !== keys.currentKey) });
-                      }
-                    }}
-                    selectedKeys={config.type || []}
-                    selectionMode="multiple"
-                  >
-                    {messageOptions.map((message) => (
-                      <SelectItem key={message.key} textValue={message.text}>
-                        {message.text}
-                      </SelectItem>
+          <div className="flex flex-row gap-2 w-full">
+            <Select
+              variant="bordered"
+              label="Choose the period"
+              onSelectionChange={(keys) => _onChangePeriod(keys.currentKey)}
+              selectedKeys={[config.period]}
+              selectionMode="single"
+              aria-label="Select a period"
+            >
+              {periodOptions.map((period) => (
+                <SelectItem key={period.key} textValue={period.text}>
+                  {period.text}
+                </SelectItem>
+              ))}
+            </Select>
+            <Select
+              variant="bordered"
+              label="Max number of steps"
+              onSelectionChange={(keys) => _onChangeSteps(keys.currentKey)}
+              selectedKeys={[config.steps]}
+              selectionMode="single"
+              aria-label="Select the number of steps"
+            >
+              {stepsOptions.map((steps) => (
+                <SelectItem key={steps.key} textValue={steps.text}>
+                  {steps.text}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
+        
+          {(config.series || config.actionId) && (
+            <div className="mt-2">
+              <Select
+                variant="bordered"
+                label="Message types"
+                renderValue={(items) => (
+                  <div className="flex flex-wrap gap-2">
+                    {items.map((item) => (
+                      <Chip key={item.key} variant="flat" size="sm">
+                        {item.textValue}
+                      </Chip>
                     ))}
-                  </Select>
-                </div>
-              )}
+                  </div>
+                )}
+                onSelectionChange={(keys) => {
+                  // add to the list if not already in it
+                  if (!config.type || !config.type.includes(keys.currentKey)) {
+                    _onChangeMessageTypes(!config.type ? [keys.currentKey] : [...config.type, keys.currentKey]);
+                  } else {
+                    setConfig({ ...config, type: [...keys] });
+                  }
+                }}
+                selectedKeys={config.type || []}
+                selectionMode="multiple"
+                aria-label="Select message types"
+              >
+                {messageOptions.map((message) => (
+                  <SelectItem key={message.key} textValue={message.text}>
+                    {message.text}
+                  </SelectItem>
+                ))}
+              </Select>
             </div>
-          </Row>
+          )}
           {config.requestRoute.indexOf("links") > -1 && (
             <>
               <Spacer y={2} />
               <Row>
-                <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-12 md:col-span-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                  <div>
                     <Text>Visualization type</Text>
                     <div style={styles.row}>
                       <Button
@@ -545,13 +544,14 @@ function CampaignsQuery(props) {
                       </Button>
                     </div>
                   </div>
-                  <div className="col-span-12 md:col-span-6 flex justify-center">
-                    <Text>Unique clicks per customer</Text>
+                  <div>
                     <Switch
                       isSelected={config.unique}
                       onChange={() => setConfig({ ...config, unique: !config.unique })}
                       size="sm"
-                    />
+                    >
+                      Unique clicks per customer
+                    </Switch>
                   </div>
                 </div>
               </Row>
@@ -563,11 +563,12 @@ function CampaignsQuery(props) {
                       <div className="col-span-12 md:col-span-9">
                         <Select
                           variant="bordered"
-                          label="Select a link"
+                          placeholder="Select a link"
                           isLoading={linksLoading}
                           onSelectionChange={(keys) => setConfig({ ...config, selectedLink: keys.currentKey })}
                           selectedKeys={[config.selectedLink]}
                           selectionMode="single"
+                          aria-label="Select a link"
                         >
                           {availableLinks.map((link) => (
                             <SelectItem key={link.key} textValue={link.text}>
@@ -576,7 +577,7 @@ function CampaignsQuery(props) {
                           ))}
                         </Select>
                       </div>
-                      <div className="col-span-12 md:col-span-3 flex items-end">
+                      <div className="col-span-12 md:col-span-3 flex items-center">
                         <Button
                           onClick={() => _onSelectClickTimeseries()}
                           color="secondary"
@@ -613,6 +614,7 @@ function CampaignsQuery(props) {
                   variant="bordered"
                   fullWidth
                   value={`${format(journeyStart, "dd MMMM yyyy")} - ${format(journeyEnd, "dd MMMM yyyy")}`}
+                  classNames={{ input: "text-start" }}
                 />
               </PopoverTrigger>
               <PopoverContent>
@@ -634,6 +636,7 @@ function CampaignsQuery(props) {
               onSelectionChange={(keys) => _onChangePeriod(keys.currentKey)}
               selectedKeys={[config.period]}
               selectionMode="single"
+              aria-label="Select a period"
             >
               {periodOptions.map((period) => (
                 <SelectItem key={period.value} textValue={period.text}>
@@ -644,15 +647,14 @@ function CampaignsQuery(props) {
           </Row>
           <Spacer y={2} />
           <Row>
-            <Text>Type of messages. Leave empty for *all* types</Text>
             <Select
               variant="bordered"
               label="Message types"
               renderValue={(items) => (
                 <div className="flex flex-wrap gap-2">
                   {items.map((item) => (
-                    <Chip key={item}>
-                      {config.type && config.type.find((t) => t === item)?.text}
+                    <Chip key={item.key} variant="flat" size="sm">
+                      {item.textValue}
                     </Chip>
                   ))}
                 </div>
@@ -662,11 +664,12 @@ function CampaignsQuery(props) {
                 if (!config.type || !config.type.includes(keys.currentKey)) {
                   _onChangeMessageTypes(!config.type ? [keys.currentKey] : [...config.type, keys.currentKey]);
                 } else {
-                  setConfig({ ...config, type: config.type.filter((t) => t !== keys.currentKey) });
+                  setConfig({ ...config, type: [...keys] });
                 }
               }}
               selectedKeys={config.type || []}
               selectionMode="multiple"
+              aria-label="Select message types"
             >
               {messageOptions.map((message) => (
                 <SelectItem key={message.key} textValue={message.text}>
@@ -687,7 +690,7 @@ function CampaignsQuery(props) {
           <Spacer y={4} />
           <Text>
             Looking good! You can now press the
-            <strong style={{ color: primary }}>{" \"Make the request\" "}</strong>
+            <strong className="text-primary">{" \"Make the request\" "}</strong>
             button
           </Text>
         </>

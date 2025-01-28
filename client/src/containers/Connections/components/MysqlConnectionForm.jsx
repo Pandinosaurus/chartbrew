@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Input, Link, Spacer, Chip, Tabs, Tab, Divider, Switch, Select, SelectItem,
-} from "@nextui-org/react";
+  CircularProgress,
+} from "@heroui/react";
 import { FaExternalLinkSquareAlt } from "react-icons/fa";
 import AceEditor from "react-ace";
 
@@ -13,24 +14,37 @@ import "ace-builds/src-min-noconflict/theme-one_dark";
 import Text from "../../../components/Text";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { RiArrowRightSLine } from "react-icons/ri";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router";
 import { testRequest, testRequestWithFiles } from "../../../slices/connection";
-import { LuCheckCircle2, LuUpload } from "react-icons/lu";
+import { LuCircleCheck, LuUpload } from "react-icons/lu";
+
+const formStrings = {
+  mysql: {
+    csPlaceholder: "mysql://username:password@mysql.example.com:3306/dbname",
+    csDescription: "mysql://username:password@mysql.example.com:3306/dbname",
+    hostname: "mysql.example.com",
+  },
+  rdsMysql: {
+    csPlaceholder: "mysql://[USERNAME]:[PASSWORD]@[HOSTNAME]:[PORT]/[DB_NAME]",
+    csDescription: "mysql://[USERNAME]:[PASSWORD]@[HOSTNAME]:[PORT]/[DB_NAME]",
+    hostname: "example-database.ref.region.rds.amazonaws.com",
+  },
+};
 
 /*
   The Form for creating a new Mysql connection
 */
 function MysqlConnectionForm(props) {
   const {
-    editConnection, onComplete, addError,
+    editConnection, onComplete, addError, subType,
   } = props;
 
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
-  const [connection, setConnection] = useState({ type: "mysql", subType: "mysql" });
+  const [connection, setConnection] = useState({ type: "mysql" });
   const [errors, setErrors] = useState({});
   const [formStyle, setFormStyle] = useState("string");
   const [testResult, setTestResult] = useState(null);
@@ -45,24 +59,32 @@ function MysqlConnectionForm(props) {
     sslKey: null,
   });
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
+  const initRef = useRef(null);
 
   useEffect(() => {
-    _init();
-  }, []);
+    if (editConnection?.id && !initRef.current) {
+      initRef.current = true;
+      _init();
+    }
+  }, [editConnection]);
+
+  useEffect(() => {
+    if (connection.subType !== subType && !editConnection) {
+      setConnection({ ...connection, subType });
+    }
+  }, [subType]);
 
   const _init = () => {
-    if (editConnection) {
-      const newConnection = editConnection;
+    const newConnection = { ...editConnection };
 
-      if (!newConnection.connectionString && newConnection.host) {
-        setFormStyle("form");
-      }
-
-      setConnection(newConnection);
+    if (!newConnection.connectionString && newConnection.host) {
+      setFormStyle("form");
     }
+
+    setConnection({ ...newConnection });
   };
 
   const _onTestRequest = async (data) => {
@@ -193,8 +215,12 @@ function MysqlConnectionForm(props) {
     }
   };
 
+  if (editConnection && !connection.id) {
+    return <CircularProgress aria-label="Loading connection" />;
+  }
+
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-semibold">
           {!editConnection && "Add a new MySQL connection"}
@@ -238,12 +264,12 @@ function MysqlConnectionForm(props) {
             <Row align="center">
               <Input
                 label="Enter your MySQL connection string"
-                placeholder="mysql://username:password@mysql.example.com:3306/dbname"
+                placeholder={formStrings[subType].csPlaceholder}
                 value={connection.connectionString || ""}
                 onChange={(e) => {
                   setConnection({ ...connection, connectionString: e.target.value });
                 }}
-                description={"mysql://username:password@mysql.example.com:3306/dbname"}
+                description={formStrings[subType].csDescription}
                 variant="bordered"
                 fullWidth
               />
@@ -280,7 +306,7 @@ function MysqlConnectionForm(props) {
               <div className="sm:col-span-12 md:col-span-10">
                 <Input
                   label="Hostname or IP address"
-                  placeholder="mysql.example.com"
+                  placeholder={formStrings[subType].hostname}
                   value={connection.host || ""}
                   onChange={(e) => {
                     setConnection({ ...connection, host: e.target.value });
@@ -378,11 +404,11 @@ function MysqlConnectionForm(props) {
                 selectionMode="single"
                 disallowEmptySelection
               >
-                <SelectItem key="require">{"Require"}</SelectItem>
-                <SelectItem key="disable">{"Disable"}</SelectItem>
-                <SelectItem key="prefer">{"Prefer"}</SelectItem>
-                <SelectItem key="verify-ca">{"Verify CA"}</SelectItem>
-                <SelectItem key="verify-full">{"Verify Full"}</SelectItem>
+                <SelectItem key="require" textValue="Require">{"Require"}</SelectItem>
+                <SelectItem key="disable" textValue="Disable">{"Disable"}</SelectItem>
+                <SelectItem key="prefer" textValue="Prefer">{"Prefer"}</SelectItem>
+                <SelectItem key="verify-ca" textValue="Verify CA">{"Verify CA"}</SelectItem>
+                <SelectItem key="verify-full" textValue="Verify Full">{"Verify Full"}</SelectItem>
               </Select>
             </Row>
             <Spacer y={2} />
@@ -410,7 +436,7 @@ function MysqlConnectionForm(props) {
                 </span>
               )}
               {!sslCertsErrors.sslCa && connection.sslCa && (
-                <LuCheckCircle2 className="text-success" size={20} />
+                <LuCircleCheck className="text-success" size={20} />
               )}
             </Row>
             <Spacer y={2} />
@@ -438,7 +464,7 @@ function MysqlConnectionForm(props) {
                 </span>
               )}
               {!sslCertsErrors.sslCert && connection.sslCert && (
-                <LuCheckCircle2 className="text-success" size={20} />
+                <LuCircleCheck className="text-success" size={20} />
               )}
             </Row>
             <Spacer y={2} />
@@ -466,7 +492,7 @@ function MysqlConnectionForm(props) {
                 </span>
               )}
               {!sslCertsErrors.sslKey && connection.sslKey && (
-                <LuCheckCircle2 className="text-success" size={20} />
+                <LuCircleCheck className="text-success" size={20} />
               )}
             </Row>
             <Spacer y={2} />
@@ -479,32 +505,7 @@ function MysqlConnectionForm(props) {
         )}
 
         <Spacer y={4} />
-        <Row align="center">
-          <RiArrowRightSLine />
-          <Spacer x={1} />
-          <Link
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://www.digitalocean.com/community/tutorials/how-to-create-a-new-user-and-grant-permissions-in-mysql"
-          >
-            <Text>{"For security reasons, connect to your MySQL database with read-only credentials"}</Text>
-          </Link>
-          <Spacer x={1} />
-          <FaExternalLinkSquareAlt size={12} />
-        </Row>
-        <Row align="center">
-          <RiArrowRightSLine />
-          <Spacer x={1} />
-          <Link
-            href="https://www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Text>{"Find out how to allow remote connections to your MySQL database"}</Text>
-          </Link>
-          <Spacer x={1} />
-          <FaExternalLinkSquareAlt size={12} />
-        </Row>
+        <FormGuides subType={subType} />
 
         {addError && (
           <Row>
@@ -576,6 +577,77 @@ function MysqlConnectionForm(props) {
     </div>
   );
 }
+
+function FormGuides({ subType }) {
+  if (subType === "rdsMysql") {
+    return (
+      <>
+        <Row align="center">
+          <RiArrowRightSLine />
+          <Spacer x={1} />
+          <Link
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://chartbrew.com/blog/how-to-connect-and-visualize-amazon-rds-with-chartbrew/#ensure-your-database-user-has-read-only-access-optional-but-recommended"
+          >
+            <Text>{"For security reasons, connect to your MySQL database with read-only credentials"}</Text>
+          </Link>
+          <Spacer x={1} />
+          <FaExternalLinkSquareAlt size={12} />
+        </Row>
+        <Row align="center">
+          <RiArrowRightSLine />
+          <Spacer x={1} />
+          <Link
+            href="https://chartbrew.com/blog/how-to-connect-and-visualize-amazon-rds-with-chartbrew/#adjust-your-rds-instance-to-allow-remote-connections"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Text>{"Find out how to allow remote connections to your MySQL database"}</Text>
+          </Link>
+          <Spacer x={1} />
+          <FaExternalLinkSquareAlt size={12} />
+        </Row>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Row align="center">
+        <RiArrowRightSLine />
+        <Spacer x={1} />
+        <Link
+          target="_blank"
+          rel="noopener noreferrer"
+          href="https://www.digitalocean.com/community/tutorials/how-to-create-a-new-user-and-grant-permissions-in-mysql"
+        >
+          <Text>{"For security reasons, connect to your MySQL database with read-only credentials"}</Text>
+        </Link>
+        <Spacer x={1} />
+        <FaExternalLinkSquareAlt size={12} />
+      </Row>
+      <Row align="center">
+        <RiArrowRightSLine />
+        <Spacer x={1} />
+        <Link
+          href="https://www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Text>{"Find out how to allow remote connections to your MySQL database"}</Text>
+        </Link>
+        <Spacer x={1} />
+        <FaExternalLinkSquareAlt size={12} />
+      </Row>
+    </>
+  )
+}
+
+FormGuides.propTypes = {
+  subType: PropTypes.string.isRequired,
+};
+
 const styles = {
   container: {
     flex: 1,
@@ -599,12 +671,14 @@ MysqlConnectionForm.defaultProps = {
   onComplete: () => {},
   editConnection: null,
   addError: false,
+  subType: "postgres",
 };
 
 MysqlConnectionForm.propTypes = {
   onComplete: PropTypes.func,
   editConnection: PropTypes.object,
   addError: PropTypes.bool,
+  subType: PropTypes.string,
 };
 
 export default MysqlConnectionForm;

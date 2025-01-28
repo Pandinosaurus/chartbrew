@@ -4,10 +4,10 @@ import { connect, useDispatch, useSelector } from "react-redux";
 import {
   Button, Popover, Divider, Input, Tooltip, Spacer, Chip, Checkbox,
   Select, SelectItem, PopoverTrigger, PopoverContent, Code, Autocomplete, AutocompleteItem,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import _ from "lodash";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { Calendar } from "react-date-range";
 import { format, sub } from "date-fns";
 import { enGB } from "date-fns/locale";
@@ -26,7 +26,7 @@ import { getMetadata } from "./apiBoilerplate";
 import { secondary } from "../../../config/colors";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 
 const validDate = /[0-9]{4}-[0-9]{2}-[0-9]{2}|today|yesterday|[0-9]+(daysAgo)/g;
 const validEndDate = /[0-9]{4}-[0-9]{2}-[0-9]{2}|today|yesterday|[0-9]+(daysAgo)/g;
@@ -36,8 +36,7 @@ const validEndDate = /[0-9]{4}-[0-9]{2}-[0-9]{2}|today|yesterday|[0-9]+(daysAgo)
 */
 function GaBuilder(props) {
   const {
-    dataRequest, connection, onSave, requests, // eslint-disable-line
-    onDelete,
+    dataRequest, connection, onSave, onDelete,
   } = props;
 
   const [gaRequest, setGaRequest] = useState({});
@@ -62,8 +61,9 @@ function GaBuilder(props) {
   const [invalidateCache, setInvalidateCache] = useState(false);
   const [fullConnection, setFullConnection] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [requestError, setRequestError] = useState("");
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const initRef = React.useRef(null);
   const params = useParams();
   const dispatch = useDispatch();
@@ -145,6 +145,7 @@ function GaBuilder(props) {
     if (metricsOptions.length > 0
       && gaRequest.configuration
       && gaRequest.configuration.metrics
+      && !configuration.metrics
     ) {
       setConfiguration({ ...configuration, metrics: gaRequest.configuration.metrics });
     }
@@ -152,6 +153,7 @@ function GaBuilder(props) {
     if (dimensionsOptions.length > 0
       && gaRequest.configuration
       && gaRequest.configuration.dimensions
+      && !configuration.dimensions
     ) {
       setConfiguration({ ...configuration, dimensions: gaRequest.configuration.dimensions });
     }
@@ -236,6 +238,8 @@ function GaBuilder(props) {
   };
 
   const _onRunRequest = (dr) => {
+    setRequestError("");
+
     const getCache = !invalidateCache;
     dispatch(runDataRequest({
       team_id: params.teamId,
@@ -245,6 +249,9 @@ function GaBuilder(props) {
     }))
       .then((data) => {
         const result = data.payload;
+        if (result?.status?.statusCode >= 400) {
+          setRequestError(result.response);
+        }
         if (result?.response?.dataRequest?.responseData?.data) {
           setResult(JSON.stringify(result.response.dataRequest.responseData.data, null, 2));
         }
@@ -253,7 +260,7 @@ function GaBuilder(props) {
       .catch((error) => {
         setRequestLoading(false);
         toast.error("The request failed. Please check your request 🕵️‍♂️");
-        setResult(JSON.stringify(error, null, 2));
+        setRequestError(error?.message);
       });
   };
 
@@ -422,6 +429,7 @@ function GaBuilder(props) {
                 isLoading={collectionsLoading}
                 onSelectionChange={(keys) => _onAccountSelected(keys.currentKey)}
                 selectionMode="single"
+                aria-label="Select an account"
               >
                 {accountOptions.map((account) => (
                   <SelectItem key={account.value} textValue={account.text}>
@@ -440,6 +448,7 @@ function GaBuilder(props) {
                 label="Property"
                 onSelectionChange={(keys) => _onPropertySelected(keys.currentKey)}
                 selectionMode="single"
+                aria-label="Select a property"
               >
                 {propertyOptions.map((property) => (
                   <SelectItem key={property.value} textValue={property.text}>
@@ -466,13 +475,14 @@ function GaBuilder(props) {
                 isDisabled={!configuration.propertyId}
                 variant="bordered"
                 isLoading={collectionsLoading}
-                selectedKeys={[configuration.metrics]}
+                selectedKey={configuration.metrics}
                 placeholder="Select a metric"
                 labelPlacement="outside"
                 errorMessage={formErrors.metrics}
                 color={formErrors.metrics ? "danger" : "default"}
                 onSelectionChange={(key) => setConfiguration({ ...configuration, metrics: key })}
                 selectionMode="single"
+                aria-label="Select a metric"
               >
                 {metricsOptions.map((item) => {
                   return (
@@ -499,13 +509,14 @@ function GaBuilder(props) {
               <Autocomplete
                 isDisabled={!configuration.propertyId}
                 variant="bordered"
-                selectedKeys={[configuration.dimensions]}
+                selectedKey={configuration.dimensions}
                 onSelectionChange={(key) => setConfiguration({ ...configuration, dimensions: key })}
                 selectionMode="single"
                 labelPlacement="outside"
                 placeholder="Select a dimension"
                 errorMessage={formErrors.dimensions}
                 color={formErrors.dimensions ? "danger" : "default"}
+                aria-label="Select a dimension"
               >
                 {dimensionsOptions.map((item) => {
                   return (
@@ -681,7 +692,7 @@ function GaBuilder(props) {
                 theme={isDark ? "one_dark" : "tomorrow"}
                 height="450px"
                 width="none"
-                value={result || ""}
+                value={requestError || result || ""}
                 name="resultEditor"
                 readOnly
                 editorProps={{ $blockScrolling: false }}

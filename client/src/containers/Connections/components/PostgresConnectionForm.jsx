@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Input, Link, Spacer, Chip, Tabs, Tab, Divider, Switch, Select, SelectItem,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router";
@@ -14,8 +14,8 @@ import "ace-builds/src-min-noconflict/theme-one_dark";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
-import { LuCheckCircle2, LuChevronRight, LuExternalLink, LuUpload } from "react-icons/lu";
+import { useTheme } from "../../../modules/ThemeContext";
+import { LuCircleCheck, LuChevronRight, LuExternalLink, LuUpload } from "react-icons/lu";
 import { testRequest, testRequestWithFiles } from "../../../slices/connection";
 
 const formStrings = {
@@ -28,6 +28,16 @@ const formStrings = {
     csPlaceholder: "postgres://username:password@helpful.example.tsdb.cloud.timescale.com:35646/dbname",
     csDescription: "postgres://username:password@helpful.example.tsdb.cloud.timescale.com:35646/dbname",
     hostname: "helpful.example.tsdb.cloud.timescale.com",
+  },
+  supabasedb: {
+    csPlaceholder: "postgres://postgres.[PROJECT_REF]:[YOUR-PASSWORD]@aws-[REGION].pooler.supabase.com:5432/postgres",
+    csDescription: "postgres://postgres.[PROJECT_REF]:[YOUR-PASSWORD]@aws-[REGION].pooler.supabase.com:5432/postgres",
+    hostname: "aws-[REGION].pooler.supabase.com",
+  },
+  rdsPostgres: {
+    csPlaceholder: "postgres://[USERNAME]:[PASSWORD]@[HOSTNAME]:[PORT]/[DB_NAME]",
+    csDescription: "postgres://[USERNAME]:[PASSWORD]@[HOSTNAME]:[PORT]/[DB_NAME]",
+    hostname: "example-database.ref.region.rds.amazonaws.com",
   },
 };
 
@@ -56,7 +66,7 @@ function PostgresConnectionForm(props) {
     sslKey: null,
   });
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
 
@@ -213,7 +223,7 @@ function PostgresConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-bold">
           {!editConnection && "Add a new connection"}
@@ -396,12 +406,13 @@ function PostgresConnectionForm(props) {
                 size="sm"
                 selectionMode="single"
                 disallowEmptySelection
+                aria-label="Select an SSL mode"
               >
-                <SelectItem key="require">{"Require"}</SelectItem>
-                <SelectItem key="disable">{"Disable"}</SelectItem>
-                <SelectItem key="prefer">{"Prefer"}</SelectItem>
-                <SelectItem key="verify-ca">{"Verify CA"}</SelectItem>
-                <SelectItem key="verify-full">{"Verify Full"}</SelectItem>
+                <SelectItem key="require" textValue="Require">{"Require"}</SelectItem>
+                <SelectItem key="disable" textValue="Disable">{"Disable"}</SelectItem>
+                <SelectItem key="prefer" textValue="Prefer">{"Prefer"}</SelectItem>
+                <SelectItem key="verify-ca" textValue="Verify CA">{"Verify CA"}</SelectItem>
+                <SelectItem key="verify-full" textValue="Verify Full">{"Verify Full"}</SelectItem>
               </Select>
             </Row>
             <Spacer y={2} />
@@ -429,7 +440,7 @@ function PostgresConnectionForm(props) {
                 </span>
               )}
               {!sslCertsErrors.sslCa && connection.sslCa && (
-                <LuCheckCircle2 className="text-success" size={20} />
+                <LuCircleCheck className="text-success" size={20} />
               )}
             </Row>
             <Spacer y={2} />
@@ -457,7 +468,7 @@ function PostgresConnectionForm(props) {
                 </span>
               )}
               {!sslCertsErrors.sslCert && connection.sslCert && (
-                <LuCheckCircle2 className="text-success" size={20} />
+                <LuCircleCheck className="text-success" size={20} />
               )}
             </Row>
             <Spacer y={2} />
@@ -485,7 +496,7 @@ function PostgresConnectionForm(props) {
                 </span>
               )}
               {!sslCertsErrors.sslKey && connection.sslKey && (
-                <LuCheckCircle2 className="text-success" size={20} />
+                <LuCircleCheck className="text-success" size={20} />
               )}
             </Row>
             <Spacer y={2} />
@@ -604,6 +615,59 @@ function FormGuides({ subType }) {
         </Row>
       </>
     )
+  }
+
+  if (subType === "supabasedb") {
+    return (
+      <>
+        <Row align="center">
+          <LuChevronRight />
+          <Spacer x={1} />
+          <Link
+            target="_blank"
+            rel="noopener"
+            href="https://chartbrew.com/blog/connect-and-visualize-supabase-database-with-chartbrew/#create-a-read-only-user"
+          >
+            <Text>{"For security reasons, connect to your Supabase database with read-only credentials"}</Text>
+          </Link>
+          <Spacer x={1} />
+          <LuExternalLink />
+        </Row>
+      </>
+    );
+  }
+
+  if (subType === "rdsPostgres") {
+    return (
+      <>
+        <Row align="center">
+          <LuChevronRight />
+          <Spacer x={1} />
+          <Link
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://chartbrew.com/blog/how-to-connect-and-visualize-amazon-rds-with-chartbrew/#ensure-your-database-user-has-read-only-access-optional-but-recommended"
+          >
+            <Text>{"For security reasons, connect to your PostgreSQL database with read-only credentials"}</Text>
+          </Link>
+          <Spacer x={1} />
+          <LuExternalLink />
+        </Row>
+        <Row align="center">
+          <LuChevronRight />
+          <Spacer x={1} />
+          <Link
+            href="https://chartbrew.com/blog/how-to-connect-and-visualize-amazon-rds-with-chartbrew/#adjust-your-rds-instance-to-allow-remote-connections"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Text>{"Find out how to allow remote connections to your PostgreSQL database"}</Text>
+          </Link>
+          <Spacer x={1} />
+          <LuExternalLink />
+        </Row>
+      </>
+    );
   }
 
   return (

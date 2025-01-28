@@ -2,12 +2,12 @@ import React, { useState, useEffect, Fragment } from "react";
 import PropTypes from "prop-types";
 import { connect } from "react-redux";
 import _ from "lodash";
-import { Flip, toast, ToastContainer } from "react-toastify";
+import toast from "react-hot-toast";
 import {
   Button, Link, Modal, Spacer, Avatar, Badge, Tooltip, Card,
   CircularProgress, ModalHeader, ModalBody, ModalFooter, CardBody,
   CardFooter, ModalContent, Spinner,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import moment from "moment";
 import { LuLink2, LuMonitorX, LuPlus } from "react-icons/lu";
 
@@ -22,7 +22,7 @@ import DatarequestSettings from "./DatarequestSettings";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/useTheme";
 
 import {
   getDataRequestByDataset as getDataRequestByDatasetAction,
@@ -52,7 +52,8 @@ function DatarequestModal(props) {
   const [createMode, setCreateMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const theme = useThemeDetector() ? "dark" : "light";
+  const { isDark } = useTheme();
+  const theme = isDark ? "dark" : "light";
   const params = useParams();
 
   useEffect(() => {
@@ -254,7 +255,7 @@ function DatarequestModal(props) {
           {initialising && (
             <>
               <Spacer x={1} />
-              <CircularProgress size="xl" />
+              <CircularProgress size="xl" aria-label="Loading dataset data" />
             </>
           )}
         </ModalHeader>
@@ -422,7 +423,7 @@ function DatarequestModal(props) {
                           onClick={() => _onCreateNewRequest(c)}
                           fullWidth
                         >
-                          <CardBody className="p-unit-4 pl-unit-8">
+                          <CardBody className="p-4 pl-unit-8">
                             <Row align="center" justify="space-between">
                               <Text size="h4">{c.name}</Text>
                               <Spacer x={0.5} />
@@ -460,20 +461,6 @@ function DatarequestModal(props) {
               </div>
             )}
           </div>
-
-          <ToastContainer
-            position="top-right"
-            autoClose={1500}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnVisibilityChange
-            draggable
-            pauseOnHover
-            transition={Flip}
-            theme={theme}
-          />
         </ModalBody>
         <ModalFooter className="bg-content1">
           <Button

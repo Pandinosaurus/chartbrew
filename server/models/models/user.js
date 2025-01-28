@@ -30,14 +30,15 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       unique: true,
       get() {
+        if (this.getDataValue("email") && this.getDataValue("email").indexOf("@") > -1) {
+          return this.getDataValue("email");
+        }
+
         try {
           return sc.decrypt(this.getDataValue("email"));
         } catch (e) {
           return this.getDataValue("email");
         }
-      },
-      set(val) {
-        return this.setDataValue("email", sc.encrypt(val));
       },
     },
     lastLogin: {
@@ -91,6 +92,7 @@ module.exports = (sequelize, DataTypes) => {
     models.User.hasMany(models.ProjectRole, { foreignKey: "user_id" });
     models.User.hasMany(models.TeamInvitation, { foreignKey: "user_id" });
     models.User.hasMany(models.ChartCache, { foreignKey: "user_id" });
+    models.User.hasMany(models.User2fa, { foreignKey: "user_id" });
   };
 
   User.beforeValidate((user) => {

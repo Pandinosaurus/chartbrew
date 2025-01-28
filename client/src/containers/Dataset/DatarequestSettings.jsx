@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   Avatar, Chip, Button, Checkbox, Divider, Input, Spacer, Tooltip,
   Select, SelectItem,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import { nanoid } from "nanoid";
 import _ from "lodash";
@@ -22,7 +22,7 @@ import connectionImages from "../../config/connectionImages";
 import fieldFinder from "../../modules/fieldFinder";
 import Row from "../../components/Row";
 import Text from "../../components/Text";
-import useThemeDetector from "../../modules/useThemeDetector";
+import { useTheme } from "../../modules/ThemeContext";
 
 function DatarequestSettings(props) {
   const {
@@ -36,7 +36,7 @@ function DatarequestSettings(props) {
   const [isSaved, setIsSaved] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
   const initRef = useRef(null);
@@ -94,7 +94,7 @@ function DatarequestSettings(props) {
   }, [joins]);
 
   useEffect(() => {
-    if (responses && responses.length > 0) {
+    if (responses && responses.length > 0 && dataset && dataset.id) {
       const selectedResponse = responses.find((o) => o.dataset_id === dataset.id);
       if (selectedResponse?.data) {
         setResult(JSON.stringify(selectedResponse.data, null, 2));
@@ -218,7 +218,7 @@ function DatarequestSettings(props) {
         return dispatch(runRequest({
           team_id: params.teamId,
           dataset_id: dataset.id,
-          useCache
+          getCache: useCache
         }));
       })
       .then(() => {
@@ -247,6 +247,7 @@ function DatarequestSettings(props) {
               selectedKeys={[`${dataset?.main_dr_id}`]}
               onSelectionChange={(keys) => _onChangeMainSource(keys.currentKey)}
               selectionMode="single"
+              aria-label="Select a main source"
             >
               {dataRequests.map((request) => (
                 <SelectItem
@@ -264,6 +265,7 @@ function DatarequestSettings(props) {
                     )) || null
                   )}
                   endContent={`${dataRequests.findIndex((o) => o.id === request.id) + 1}`}
+                  textValue={request.Connection?.name || ""}
                 >
                   {request.Connection?.name || ""}
                 </SelectItem>
@@ -298,6 +300,7 @@ function DatarequestSettings(props) {
                     selectionMode="single"
                     color="primary"
                     isDisabled
+                    aria-label="Select a source"
                   >
                     {_getAllowedDataRequests(index).map((request) => (
                       <SelectItem
@@ -311,6 +314,7 @@ function DatarequestSettings(props) {
                           />
                         )}
                         endContent={`${dataRequests.findIndex((o) => o.id === request.id) + 1}`}
+                        textValue={request.Connection.name}
                       >
                         {request.Connection.name}
                       </SelectItem>
@@ -340,6 +344,7 @@ function DatarequestSettings(props) {
                     onSelectionChange={(keys) => _onChangeJoin(join.key, { join_id: parseInt(keys.currentKey, 10) })}
                     selectionMode="single"
                     color="secondary"
+                    aria-label="Select a source"
                   >
                     {dataRequests.map((request) => (
                       <SelectItem
@@ -353,6 +358,7 @@ function DatarequestSettings(props) {
                           />
                         )}
                         endContent={`${dataRequests.findIndex((o) => o.id === request.id) + 1}`}
+                        textValue={request.Connection.name}
                       >
                         {request.Connection.name}
                       </SelectItem>
@@ -377,9 +383,12 @@ function DatarequestSettings(props) {
                     onSelectionChange={(keys) => _onChangeJoin(join.key, { dr_field: keys.currentKey })}
                     selectionMode="single"
                     color="primary"
+                    aria-label="Select a field"
                   >
                     {_getFieldOptions(join.key, "dr_id").map((f) => (
-                      <SelectItem key={f.field}>{_renderHumanField(f.field)}</SelectItem>
+                      <SelectItem key={f.field} textValue={_renderHumanField(f.field)}>
+                        {_renderHumanField(f.field)}
+                      </SelectItem>
                     ))}
                   </Select>
                 </div>
@@ -398,9 +407,12 @@ function DatarequestSettings(props) {
                     onSelectionChange={(keys) => _onChangeJoin(join.key, { join_field: keys.currentKey })}
                     selectionMode="single"
                     color="secondary"
+                    aria-label="Select a field"
                   >
                     {_getFieldOptions(join.key, "join_id").map((f) => (
-                      <SelectItem key={f.field}>{_renderHumanField(f.field)}</SelectItem>
+                      <SelectItem key={f.field} textValue={_renderHumanField(f.field)}>
+                        {_renderHumanField(f.field)}
+                      </SelectItem>
                     ))}
                   </Select>
                 </div>

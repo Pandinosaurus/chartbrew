@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
-import { Autocomplete, AutocompleteItem, Button, Card, CardBody, CardFooter, CardHeader, Checkbox, Chip, Divider, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Input, Link, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Popover, PopoverContent, PopoverTrigger, Spacer, Tooltip } from "@nextui-org/react";
-import { LuCalendarDays, LuCheckCircle, LuEye, LuEyeOff, LuFilter, LuPlus, LuRedo, LuSettings, LuXCircle } from "react-icons/lu";
-import { format, formatISO } from "date-fns";
-import { Calendar } from "react-date-range";
-import { enGB } from "date-fns/locale";
+import {
+  Autocomplete, AutocompleteItem, Button, Card, CardBody, CardFooter, CardHeader,
+  Checkbox, Chip, DatePicker, Divider, Dropdown, DropdownItem, DropdownMenu,
+  DropdownTrigger, Input, Link, Modal, ModalBody, ModalContent, ModalFooter,
+  ModalHeader, Spacer, Tooltip,
+} from "@heroui/react";
+import {
+  LuCircleCheck, LuEye, LuEyeOff, LuListFilter, LuPlus, LuRedo,
+  LuSettings, LuCircleX,
+} from "react-icons/lu";
 import { find } from "lodash";
+import { nanoid } from "@reduxjs/toolkit";
+import { parseDate } from "@internationalized/date";
+import { I18nProvider } from "@react-aria/i18n";
 
 import Row from "./Row";
 import Text from "./Text";
-import { secondary } from "../config/colors";
 import { operators } from "../modules/filterOperations";
-import { nanoid } from "@reduxjs/toolkit";
 
 function DatasetFilters(props) {
   const { onUpdate, fieldOptions, dataset } = props;
@@ -19,6 +25,7 @@ function DatasetFilters(props) {
   const [conditions, setConditions] = useState([]);
   const [selectedCondition, setSelectedCondition] = useState({});
   const [conditionModal, setConditionModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (dataset.conditions) {
@@ -107,7 +114,7 @@ function DatasetFilters(props) {
     setConditionModal(true);
   };
 
-  const _onConfirmConditionSettings = () => {
+  const _onConfirmConditionSettings = async () => {
     const newConditions = conditions.map((item) => {
       let newItem = { ...item };
       if (item.id === selectedCondition.id) {
@@ -117,9 +124,20 @@ function DatasetFilters(props) {
       return newItem;
     });
 
-    onUpdate({ conditions: newConditions });
+    setIsLoading(true);
+    await onUpdate({ conditions: newConditions });
+    setIsLoading(false);
     setSelectedCondition({});
     setConditionModal(false);
+  };
+
+  const _isVariableValid = (val) => {
+    const regex = /^[a-zA-Z_][a-zA-Z0-9_]{0,31}$/;
+    if (regex.test(val)) {
+      return true;
+    }
+
+    return false;
   };
 
   return (
@@ -128,7 +146,7 @@ function DatasetFilters(props) {
         <div className="datasetdata-filters-tut">
           <Button
             variant="bordered"
-            startContent={<LuFilter />}
+            startContent={<LuListFilter />}
             onClick={_onAddCondition}
             auto
             size={"sm"}
@@ -152,6 +170,8 @@ function DatasetFilters(props) {
                 selectedKey={condition.field}
                 onSelectionChange={(key) => _updateCondition(condition.id, key, "field")}
                 labelPlacement="outside"
+                size="sm"
+                aria-label="Field"
               >
                 {fieldOptions.filter((f) => !f.isObject).map((field) => (
                   <AutocompleteItem
@@ -167,7 +187,7 @@ function DatasetFilters(props) {
               </Autocomplete>
               <Spacer y={1} />
               <Row warp="wrap" className={"flex gap-2"} align="center">
-                <Dropdown>
+                <Dropdown aria-label="Select an operator">
                   <DropdownTrigger>
                     <Input
                       value={
@@ -180,6 +200,7 @@ function DatasetFilters(props) {
                       variant="bordered"
                       labelPlacement="outside"
                       className="max-w-[100px]"
+                      size="sm"
                     />
                   </DropdownTrigger>
                   <DropdownMenu
@@ -188,7 +209,7 @@ function DatasetFilters(props) {
                     selectionMode="single"
                   >
                     {operators.map((operator) => (
-                      <DropdownItem key={operator.value}>
+                      <DropdownItem key={operator.value} textValue={operator.text}>
                         {operator.text}
                       </DropdownItem>
                     ))}
@@ -205,30 +226,24 @@ function DatasetFilters(props) {
                         disabled={(condition.operator === "isNotNull" || condition.operator === "isNull")}
                         labelPlacement="outside"
                         variant="bordered"
+                        size="sm"
                       />
                     )}
+
                   {find(fieldOptions, { value: condition.field })
                     && find(fieldOptions, { value: condition.field }).type === "date" && (
-                      <Popover>
-                        <PopoverTrigger>
-                          <Input
-                            endContent={<LuCalendarDays />}
-                            placeholder="Enter a value"
-                            value={(condition.value && format(new Date(condition.value), "Pp", { locale: enGB })) || "Enter a value"}
-                            disabled={(condition.operator === "isNotNull" || condition.operator === "isNull")}
-                            labelPlacement="outside"
-                            variant="bordered"
-                          />
-                        </PopoverTrigger>
-                        <PopoverContent>
-                          <Calendar
-                            date={(condition.value && new Date(condition.value)) || new Date()}
-                            onChange={(date) => _updateCondition(condition.id, formatISO(date), "value", find(fieldOptions, { value: condition.field }).type)}
-                            locale={enGB}
-                            color={secondary}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <I18nProvider locale="en-GB">
+                        <DatePicker
+                          variant="bordered"
+                          showMonthAndYearPickers
+                          value={(
+                            condition.value
+                            && parseDate(condition.value)
+                          ) || null}
+                          onChange={(date) => _updateCondition(condition.id, date.toString(), "value", find(fieldOptions, { value: condition.field }).type)}
+                          size="sm"
+                        />
+                      </I18nProvider>
                     )}
                 </div>
               </Row>
@@ -239,7 +254,7 @@ function DatasetFilters(props) {
                 <Tooltip content="Apply this condition">
                   <Button
                     color="success"
-                    endContent={<LuCheckCircle size={18} />}
+                    endContent={<LuCircleCheck size={18} />}
                     variant="light"
                     size="sm"
                     onClick={() => _onApplyCondition(condition.id, condition.exposed)}
@@ -250,10 +265,10 @@ function DatasetFilters(props) {
                 </Tooltip>
               )}
 
-              <Tooltip content="Remove condition">
+              <Tooltip content="Remove filter">
                 <Button
                   color="danger"
-                  endContent={<LuXCircle size={18} />}
+                  endContent={<LuCircleX size={18} />}
                   variant="light"
                   size="sm"
                   onClick={() => _onRemoveCondition(condition.id)}
@@ -318,7 +333,7 @@ function DatasetFilters(props) {
                 </Tooltip>
               )}
               {condition.saved && (
-                <Tooltip content="Condition settings">
+                <Tooltip content="Filter settings">
                   <Button
                     variant="light"
                     size="sm"
@@ -337,19 +352,19 @@ function DatasetFilters(props) {
       {conditions?.length > 0 && (
         <div className="col-span-12">
           <Button
-            variant="light"
-            color="primary"
+            variant="flat"
             onClick={_onAddCondition}
-            startContent={<LuPlus />}
+            endContent={<LuPlus />}
             size="sm"
           >
-            Add a new condition
+            Add a new filter
           </Button>
+          <Spacer y={2} />
         </div>
       )}
       {conditions.filter((c) => c.exposed).length > 0 && (
         <div>
-          <div><Text>{"Exposed filters on the chart"}</Text></div>
+          <div>{"Exposed filters on the chart"}</div>
           <Spacer y={1} />
           <div className="flex gap-1">
             {conditions.filter((c) => c.exposed).map((condition) => {
@@ -368,7 +383,7 @@ function DatasetFilters(props) {
                       )}
                       color="danger"
                     >
-                      <LuXCircle size={16} />
+                      <LuCircleX size={16} />
                     </Link>
                   )}
                 >
@@ -383,7 +398,7 @@ function DatasetFilters(props) {
       <Modal isOpen={conditionModal} size="lg" onClose={() => setConditionModal(false)}>
         <ModalContent>
           <ModalHeader>
-            <Text size="h4">Condition settings</Text>
+            <Text size="h4">Filter settings</Text>
           </ModalHeader>
           <ModalBody>
             <Row>
@@ -400,6 +415,20 @@ function DatasetFilters(props) {
                 }
                 fullWidth
                 variant="bordered"
+              />
+            </Row>
+            <Row>
+              <Input
+                label="Assign a variable name to filter"
+                placeholder="Enter a variable name"
+                onChange={(e) => {
+                  setSelectedCondition({ ...selectedCondition, variable: e.target.value });
+                }}
+                value={selectedCondition.variable}
+                fullWidth
+                variant="bordered"
+                errorMessage={selectedCondition.variable && !_isVariableValid(selectedCondition.variable) && "Variables must start with a letter and contain only letters, numbers, and underscores"}
+                description="Variables are used to reference the filter value in when embedding the chart or filtering on the dashboard"
               />
             </Row>
             <Row>
@@ -429,12 +458,16 @@ function DatasetFilters(props) {
             <Button
               onClick={_onConfirmConditionSettings}
               color="primary"
+              isDisabled={selectedCondition.variable && !_isVariableValid(selectedCondition.variable)}
+              isLoading={isLoading}
             >
               Save settings
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import {
   Progress, Tooltip,
-} from "@nextui-org/react";
+} from "@heroui/react";
 
 import determineType from "../../../modules/determineType";
 import Row from "../../../components/Row";
@@ -61,15 +61,14 @@ function KpiMode(props) {
     const { status, comparison } = c;
     return (
       <div>
-        <Tooltip content={`compared to last ${chart.timeInterval}`}>
+        <Tooltip content={`compared to last ${chart.timeInterval}`} placement="bottom">
           <div className="w-full py-1">
-            <Text
-              size="sm"
-              className={status === "neutral" ? "text-gray-500" : status === "positive" ? "text-success" : "text-danger"}
+            <span
+              className={`text-sm ${status === "neutral" ? "text-gray-500" : status === "positive" ? "text-success" : "text-danger"}`}
             >
               {status === "positive" ? "+" : ""}
               {`${comparison}%`}
-            </Text>
+            </span>
           </div>
         </Tooltip>
       </div>
@@ -96,6 +95,7 @@ function KpiMode(props) {
               background: color
             }
           }}
+          aria-label="Goal progress"
         />
         <Row justify="space-between">
           <Text size="sm">{`${((value / max) * 100).toFixed()}%`}</Text>

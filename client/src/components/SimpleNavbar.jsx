@@ -1,18 +1,18 @@
 import React from "react";
 import {
   Image, Navbar, Link as LinkNext, NavbarBrand, NavbarContent, NavbarItem,
-} from "@nextui-org/react";
+} from "@heroui/react";
 
 import Text from "./Text";
-import useThemeDetector from "../modules/useThemeDetector";
+import { useTheme } from "../modules/ThemeContext";
 import cbLogoDark from "../assets/logo_full_dark.png";
 import cbLogoLight from "../assets/logo_full_light.png";
 
 function SimpleNavbar() {
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
 
   return (
-    <Navbar maxWidth={"full"}>
+    <Navbar maxWidth={"full"} className="z-50">
       <NavbarBrand>
         <a href="https://chartbrew.com">
           <Image src={isDark ? cbLogoDark : cbLogoLight} alt="Chartbrew Logo" width={150} radius="sm" />

@@ -4,7 +4,7 @@ import React, {
 import PropTypes from "prop-types";
 import {
   Button, Input, Spacer, Chip, Divider,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import cookie from "react-cookies";
 import { FaGoogle } from "react-icons/fa";
@@ -17,7 +17,7 @@ import { API_HOST } from "../../../config/settings";
 import Container from "../../../components/Container";
 import Text from "../../../components/Text";
 import Row from "../../../components/Row";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router";
 import { testRequest } from "../../../slices/connection";
@@ -39,7 +39,7 @@ function GaConnectionForm(props) {
   const [errors, setErrors] = useState({});
   const [testResult, setTestResult] = useState(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
 
@@ -129,7 +129,7 @@ function GaConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-semibold">
           {!editConnection && "Connect to Google Analytics"}

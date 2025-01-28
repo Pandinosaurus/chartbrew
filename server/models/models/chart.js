@@ -128,7 +128,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     onReport: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
     },
     xLabelTicks: {
       type: DataTypes.STRING,
@@ -165,7 +165,15 @@ module.exports = (sequelize, DataTypes) => {
           return this.getDataValue("layout");
         }
       },
-    }
+    },
+    snapshotToken: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+    },
+    isLogarithmic: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   }, {
     freezeTableName: true,
   });
@@ -175,6 +183,7 @@ module.exports = (sequelize, DataTypes) => {
     models.Chart.hasMany(models.Dataset, { foreignKey: "chart_id" });
     models.Chart.hasMany(models.Chartshare, { foreignKey: "chart_id" });
     models.Chart.belongsTo(models.Project, { foreignKey: "project_id" });
+    models.Chart.hasMany(models.Alert, { foreignKey: "chart_id" });
   };
 
   return Chart;

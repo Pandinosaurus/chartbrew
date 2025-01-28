@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { useParams } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { TbMathFunctionY } from "react-icons/tb";
-import { LuCheckCircle, LuInfo, LuWand2, LuXCircle } from "react-icons/lu";
+import { LuCircleCheck, LuInfo, LuWandSparkles, LuCircleX } from "react-icons/lu";
 
 import ChartPreview from "../AddChart/components/ChartPreview";
 import Row from "../../components/Row";
-import { Autocomplete, AutocompleteItem, Chip, Divider, Input, Link, Popover, PopoverContent, PopoverTrigger, Select, SelectItem, Spacer, Tooltip } from "@nextui-org/react";
+import { Autocomplete, AutocompleteItem, Chip, Divider, Input, Link, Popover, PopoverContent, PopoverTrigger, Select, SelectItem, Spacer, Tooltip } from "@heroui/react";
 import Text from "../../components/Text";
 import autoFieldSelector from "../../modules/autoFieldSelector";
 import fieldFinder from "../../modules/fieldFinder";
@@ -225,20 +225,22 @@ function DatasetBuilder(props) {
   };
 
   const _onUpdateDataset = (data) => {
-    dispatch(updateDataset({
+    return dispatch(updateDataset({
       team_id: dataset.team_id,
       dataset_id: dataset.id,
       data,
     }))
       .then(() => {
         toast.success("Dataset updated successfully.");
-        return dispatch(runQuery({
+        dispatch(runQuery({
           project_id: projectId,
           chart_id: chart.id,
           noSource: false,
           skipParsing: false,
           getCache: true,
         }));
+
+        return true;
       })
       .catch(() => {
         toast.error("Could not refresh the dataset. Please check your query.");
@@ -298,7 +300,7 @@ function DatasetBuilder(props) {
   const _onChangeGlobalSettings = ({
     pointRadius, displayLegend, dateRange, includeZeros, timeInterval, currentEndDate,
     fixedStartDate, maxValue, minValue, xLabelTicks, stacked, horizontal, dataLabels,
-    dateVarsFormat,
+    dateVarsFormat, isLogarithmic,
   }) => {
     const tempChart = {
       pointRadius: typeof pointRadius !== "undefined" ? pointRadius : chart.pointRadius,
@@ -318,6 +320,7 @@ function DatasetBuilder(props) {
       horizontal: typeof horizontal !== "undefined" ? horizontal : chart.horizontal,
       dataLabels: typeof dataLabels !== "undefined" ? dataLabels : chart.dataLabels,
       dateVarsFormat: dateVarsFormat !== "undefined" ? dateVarsFormat : chart.dateVarsFormat,
+      isLogarithmic: typeof isLogarithmic !== "undefined" ? isLogarithmic : chart.isLogarithmic,
     };
 
     let skipParsing = false;
@@ -365,6 +368,7 @@ function DatasetBuilder(props) {
           selectedKey={dataset.xAxis}
           onSelectionChange={(key) => _onUpdateDataset({ xAxis: key })}
           isLoading={loadingFields}
+          aria-label="Select a dimension"
         >
           {_filterOptions("x").map((option) => (
             <AutocompleteItem
@@ -373,6 +377,7 @@ function DatasetBuilder(props) {
                 <Chip size="sm" variant="flat" className={"min-w-[70px] text-center"} color={option.label.color}>{option.label.content}</Chip>
               )}
               description={option.isObject ? "Key-Value visualization" : null}
+              textValue={option.text}
             >
               {option.text}
             </AutocompleteItem>
@@ -389,6 +394,7 @@ function DatasetBuilder(props) {
           selectedKey={dataset.yAxis}
           onSelectionChange={(key) => _onUpdateDataset({ yAxis: key })}
           isLoading={loadingFields}
+          aria-label="Select a metric"
         >
           {_getYFieldOptions().map((option) => (
             <AutocompleteItem
@@ -397,6 +403,7 @@ function DatasetBuilder(props) {
                 <Chip size="sm" variant="flat" className={"min-w-[70px] text-center"} color={option.label.color}>{option.label.content}</Chip>
               )}
               description={option.isObject ? "Key-Value visualization" : null}
+              textValue={option.text}
             >
               {option.text}
             </AutocompleteItem>
@@ -419,9 +426,10 @@ function DatasetBuilder(props) {
                 || "Operation"}
             </Text>
           )}
+          aria-label="Select an operation"
         >
           {operations.map((option) => (
-            <SelectItem key={option.value}>
+            <SelectItem key={option.value} textValue={option.text}>
               {option.text}
             </SelectItem>
           ))}
@@ -438,6 +446,7 @@ function DatasetBuilder(props) {
             selectedKey={dataset.dateField}
             onSelectionChange={(key) => _onUpdateDataset({ dateField: key })}
             isLoading={loadingFields}
+            aria-label="Select a date field used for filtering"
           >
             {_getDateFieldOptions().map((option) => (
               <AutocompleteItem
@@ -445,6 +454,7 @@ function DatasetBuilder(props) {
                 startContent={(
                   <Chip size="sm" variant="flat" className={"min-w-[70px] text-center"} color={option.label.color}>{option.label.content}</Chip>
                 )}
+                textValue={option.text}
               >
                 {option.text}
               </AutocompleteItem>
@@ -468,11 +478,11 @@ function DatasetBuilder(props) {
             <div className="flex flex-col">
               <Popover>
                 <PopoverTrigger>
-                  <div className="flex flex-row gap-1 items-center">
+                  <div className="flex flex-row gap-1 items-center cursor-pointer">
                     <span className="text-sm">
                       {"Metric formula"}
                     </span>
-                    <LuInfo size={18} />
+                    <LuInfo size={18} className="hover:text-primary" />
                   </div>
                 </PopoverTrigger>
                 <PopoverContent>
@@ -497,18 +507,18 @@ function DatasetBuilder(props) {
                       content={"Apply the formula"}
                     >
                       <Link onClick={_onApplyFormula}>
-                        <LuCheckCircle className={"text-success"} />
+                        <LuCircleCheck className={"text-success"} />
                       </Link>
                     </Tooltip>
                   )}
                   <Tooltip content="Remove formula">
                     <Link onClick={_onRemoveFormula}>
-                      <LuXCircle className="text-danger" />
+                      <LuCircleX className="text-danger" />
                     </Link>
                   </Tooltip>
                   <Tooltip content="Click for an example">
                     <Link onClick={_onExampleFormula}>
-                      <LuWand2 className="text-primary" />
+                      <LuWandSparkles className="text-primary" />
                     </Link>
                   </Tooltip>
                 </div>
@@ -521,6 +531,11 @@ function DatasetBuilder(props) {
         <Divider />
         <Spacer y={4} />
 
+        <div className="">
+          Filter settings
+        </div>
+        <Spacer y={2} />
+
         <DatasetFilters
           onUpdate={_onUpdateDataset}
           fieldOptions={fieldOptions}
@@ -532,7 +547,7 @@ function DatasetBuilder(props) {
         <ChartPreview
           chart={chart}
           onRefreshPreview={() => _onRefreshPreview()}
-          onRefreshData={() => _onRefreshPreview(true)}
+          onRefreshData={() => _onRefreshPreview(useCache)}
           onChange={(data) => _onUpdateChart(data)}
           changeCache={() => setUseCache(!useCache)}
           useCache={useCache}
@@ -542,24 +557,9 @@ function DatasetBuilder(props) {
 
         {chart?.id && (
           <ChartSettings
-            type={chart.type}
-            pointRadius={chart.pointRadius}
-            startDate={chart.startDate}
-            endDate={chart.endDate}
-            displayLegend={chart.displayLegend}
-            includeZeros={chart.includeZeros}
-            currentEndDate={chart.currentEndDate}
-            fixedStartDate={chart.fixedStartDate}
-            timeInterval={chart.timeInterval}
+            chart={chart}
             onChange={_onChangeGlobalSettings}
             onComplete={(skipParsing = false) => _onRefreshPreview(skipParsing)}
-            maxValue={chart.maxValue}
-            minValue={chart.minValue}
-            xLabelTicks={chart.xLabelTicks}
-            stacked={chart.stacked}
-            horizontal={chart.horizontal}
-            dateVarsFormat={chart.dateVarsFormat}
-            dataLabels={chart.dataLabels}
           />
         )}
       </div>

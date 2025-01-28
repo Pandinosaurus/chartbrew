@@ -4,16 +4,17 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   Button, Checkbox, Divider, Input, Link, Spacer, Tooltip, Chip,
   Tabs, Tab, Select, SelectItem, PopoverTrigger, Popover, PopoverContent,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
-import uuid from "uuid/v4";
-import { toast } from "react-toastify";
+import { v4 as uuid } from "uuid";
+import toast from "react-hot-toast";
 import { useParams } from "react-router";
-import { LuCalendarDays, LuInfo, LuPlay, LuPlus, LuPlusCircle, LuTrash, LuXCircle } from "react-icons/lu";
+import { LuCalendarDays, LuInfo, LuPlay, LuPlus, LuCirclePlus, LuTrash, LuCircleX } from "react-icons/lu";
 import { endOfDay, startOfDay, sub } from "date-fns";
 import { Calendar } from "react-date-range";
 import { enGB } from "date-fns/locale";
 import moment from "moment";
+import { cloneDeep, isEqual } from "lodash";
 
 import "ace-builds/src-min-noconflict/mode-json";
 import "ace-builds/src-min-noconflict/mode-javascript";
@@ -28,8 +29,7 @@ import {
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
-import { isEqual } from "lodash";
+import { useTheme } from "../../../modules/ThemeContext";
 
 const methods = [{
   key: 1,
@@ -71,7 +71,7 @@ function ApiBuilder(props) {
   const [activeMenu, setActiveMenu] = useState("headers");
   const [requestSuccess, setRequestSuccess] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
-  const [requestError, setRequestError] = useState(false);
+  const [requestError, setRequestError] = useState("");
   const [invalidateCache, setInvalidateCache] = useState(false);
   const [fullConnection, setFullConnection] = useState({});
   const [saveLoading, setSaveLoading] = useState(false);
@@ -90,10 +90,11 @@ function ApiBuilder(props) {
     },
   });
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
-  const initRef = useRef(null);
+  const initRef = useRef(false);
+  const connectionInitRef = useRef(false);
 
   const stateDrs = useSelector((state) => selectDataRequests(state, params.datasetId));
 
@@ -123,7 +124,14 @@ function ApiBuilder(props) {
       formattedApiRequest.formattedHeaders = formattedHeaders;
 
       if (dataRequest.variables) {
-        setVariables(dataRequest.variables);
+        const formattedVariables = cloneDeep(dataRequest.variables);
+        if (formattedVariables.startDate && formattedVariables.startDate.value) {
+          formattedVariables.startDate.value = startOfDay(moment(formattedVariables.startDate.value).toDate());
+        }
+        if (formattedVariables.endDate && formattedVariables.endDate.value) {
+          formattedVariables.endDate.value = endOfDay(moment(formattedVariables.endDate.value).toDate());
+        }
+        setVariables(formattedVariables);
       } else if (variables) {
         formattedApiRequest.variables = variables;
       }
@@ -137,18 +145,20 @@ function ApiBuilder(props) {
 
     // automate the pagination template here (to a possible extent)
     if (connection && apiRequest && !apiRequest.template) {
-      if (connection.host.indexOf("api.stripe.com") > -1) {
-        apiRequest.template = "stripe";
+      if (connection?.host?.indexOf("api.stripe.com") > -1) {
+        newApiRequest.template = "stripe";
+        onChangeRequest(newApiRequest);
       }
     }
 
-    dispatch(getConnection({ team_id: params.teamId, connection_id: connection.id }))
-      .then((data) => {
-        setFullConnection(data.payload);
-      })
-      .catch(() => {});
-
-    onChangeRequest(newApiRequest);
+    if (connection && !connectionInitRef.current) {
+      dispatch(getConnection({ team_id: params.teamId, connection_id: connection.id }))
+        .then((data) => {
+          setFullConnection(data.payload);
+        })
+        .catch(() => {});
+      connectionInitRef.current = true;
+    }
   }, [apiRequest, connection]);
 
   useEffect(() => {
@@ -251,8 +261,8 @@ function ApiBuilder(props) {
     toast.success("Variables saved 👌");
   };
 
-  const _onTest = (dr = dataRequest) => {
-    const { formattedHeaders } = apiRequest;
+  const _onTest = (dr = apiRequest) => {
+    const { formattedHeaders } = dr;
     let newHeaders = {};
     for (let i = 0; i < formattedHeaders.length; i++) {
       if (formattedHeaders[i].key && formattedHeaders[i].value) {
@@ -260,12 +270,12 @@ function ApiBuilder(props) {
       }
     }
 
-    const finalApiRequest = { dataRequest: apiRequest };
+    const finalApiRequest = { dataRequest: dr };
     finalApiRequest.dataRequest.headers = newHeaders;
 
     setRequestLoading(true);
     setRequestSuccess(false);
-    setRequestError(false);
+    setRequestError("");
 
     onSave(dr).then(() => {
       const getCache = !invalidateCache;
@@ -277,11 +287,14 @@ function ApiBuilder(props) {
       }))
         .then((data) => {
           const result = data.payload;
+          if (result?.status?.statusCode >= 400) {
+            setRequestError(result);
+          }
           if (result?.response?.dataRequest?.responseData?.data) {
             setResult(JSON.stringify(result.response.dataRequest.responseData.data, null, 2));
+            setRequestSuccess(result.status);
           }
           setRequestLoading(false);
-          setRequestSuccess(result.status);
         })
         .catch((error) => {
           setRequestLoading(false);
@@ -342,7 +355,7 @@ function ApiBuilder(props) {
               startContent={(
                 <div className="pointer-events-none flex items-center">
                   <span className="text-default-400 text-small">
-                    {`${connection.host}`}
+                    {`${fullConnection.host}`}
                   </span>
                 </div>
               )}
@@ -371,7 +384,7 @@ function ApiBuilder(props) {
                   variant="faded"
                   endContent={(
                     <a onClick={() => chart.startDate && _onChangeRoute(`${apiRequest.route}{{ start_date }}`)} className="cursor-pointer">
-                      <LuPlusCircle />
+                      <LuCirclePlus />
                     </a>
                   )}
                 >
@@ -389,7 +402,7 @@ function ApiBuilder(props) {
                   variant="faded"
                   endContent={(
                     <a onClick={() => chart.endDate && _onChangeRoute(`${apiRequest.route}{{ end_date }}`)} className="cursor-pointer">
-                      <LuPlusCircle />
+                      <LuCirclePlus />
                     </a>
                   )}
                 >
@@ -488,7 +501,7 @@ function ApiBuilder(props) {
               <Spacer y={4} />
             </>
           )}
-          <Row className="apibuilder-menu-tut justify-between">
+          <Row className="apibuilder-menu-tut">
             <Tabs
               selectedKey={activeMenu}
               onSelectionChange={(key) => setActiveMenu(key)}
@@ -498,18 +511,6 @@ function ApiBuilder(props) {
               <Tab key="body" title="Body" />
               <Tab key="pagination" title="Pagination" />
             </Tabs>
-            {requestSuccess && (
-              <>
-                <Chip color="success" size="sm">
-                  {`${requestSuccess.statusCode} ${requestSuccess.statusText}`}
-                </Chip>
-              </>
-            )}
-            {requestError && (
-              <Chip color="danger" size="sm">
-                {`${requestError.statusCode} ${requestError.statusText}`}
-              </Chip>
-            )}
           </Row>
 
           <Spacer y={2} />
@@ -593,7 +594,7 @@ function ApiBuilder(props) {
                           color="danger"
                           variant="light"
                         >
-                          <LuXCircle />
+                          <LuCircleX />
                         </Button>
                       </Row>
                       <Spacer y={1} />
@@ -627,6 +628,7 @@ function ApiBuilder(props) {
                   }}
                   name="queryEditor"
                   editorProps={{ $blockScrolling: true }}
+                  className="rounded-md border-1 border-solid border-content3"
                 />
               </div>
             </Row>
@@ -656,9 +658,10 @@ function ApiBuilder(props) {
               selectedKeys={[apiRequest.method]}
               selectionMode="single"
               labelPlacement="ouside"
+              aria-label="Select a method"
             >
               {methods.map((method) => (
-                <SelectItem key={method.value}>
+                <SelectItem key={method.value} textValue={method.text}>
                   {method.text}
                 </SelectItem>
               ))}
@@ -674,27 +677,43 @@ function ApiBuilder(props) {
             </Button>
           </Row>
           <Spacer y={2} />
-          <Row align="center">
-            <Checkbox
-              isSelected={!invalidateCache}
-              onChange={() => setInvalidateCache(!invalidateCache)}
-              size="sm"
-            >
-              Use cache
-            </Checkbox>
-            <Spacer x={0.5} />
-            <Tooltip
-              content={(
+          <div className="flex flex-row justify-between items-center">
+            <div className="flex flex-row gap-2 items-center">
+              <Checkbox
+                isSelected={!invalidateCache}
+                onChange={() => setInvalidateCache(!invalidateCache)}
+                size="sm"
+              >
+                Use cache
+              </Checkbox>
+              <Tooltip
+                content={(
+                  <>
+                    <p>{"Chartbrew will use cached data for extra editing speed ⚡️"}</p>
+                    <p>{"The cache gets automatically invalidated when you change the configuration of the request."}</p>
+                  </>
+                )}
+                placement="bottom"
+              >
+                <div><LuInfo /></div>
+              </Tooltip>
+            </div>
+
+            <div>
+              {requestSuccess && (
                 <>
-                  <p>{"Chartbrew will use cached data for extra editing speed ⚡️"}</p>
-                  <p>{"The cache gets automatically invalidated when you change the configuration of the request."}</p>
+                  <Chip color="success" size="sm" variant="flat">
+                    {`${requestSuccess.statusCode} ${requestSuccess.statusText}`}
+                  </Chip>
                 </>
               )}
-              placement="bottom"
-            >
-              <div><LuInfo /></div>
-            </Tooltip>
-          </Row>
+              {requestError && (
+                <Chip color="danger" size="sm" variant="flat">
+                  {`${requestError?.status?.statusCode} ${requestError?.status?.statusText}`}
+                </Chip>
+              )}
+            </div>
+          </div>
           <Spacer y={2} />
           <Row>
             <div className="w-full">
@@ -704,11 +723,11 @@ function ApiBuilder(props) {
                 style={{ borderRadius: 10 }}
                 height="450px"
                 width="none"
-                value={result || ""}
+                value={(requestError && JSON.stringify(requestError)) || result || ""}
                 name="resultEditor"
                 readOnly
                 editorProps={{ $blockScrolling: false }}
-                className="apibuilder-result-tut"
+                className="apibuilder-result-tut rounded-md border-1 border-solid border-content3"
               />
             </div>
           </Row>

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const moment = require("moment");
 const Sequelize = require("sequelize");
 const { nanoid } = require("nanoid");
-const uuid = require("uuid/v4");
+const { v4: uuid } = require("uuid");
 
 const externalDbConnection = require("../modules/externalDbConnection");
 
@@ -12,6 +12,7 @@ const ConnectionController = require("./ConnectionController");
 const DataRequestController = require("./DataRequestController");
 const ChartCacheController = require("./ChartCacheController");
 const dataExtractor = require("../charts/DataExtractor");
+const { snapChart } = require("../modules/chartSnapshot");
 
 // charts
 const AxisChart = require("../charts/AxisChart");
@@ -56,7 +57,8 @@ class ChartController {
       order: [["dashboardOrder", "ASC"], [db.ChartDatasetConfig, "order", "ASC"]],
       include: [
         { model: db.ChartDatasetConfig, include: [{ model: db.Dataset }] },
-        { model: db.Chartshare }
+        { model: db.Chartshare },
+        { model: db.Alert },
       ],
     })
       .then((charts) => {
@@ -72,7 +74,8 @@ class ChartController {
       where: { id },
       include: [
         { model: db.ChartDatasetConfig, include: [{ model: db.Dataset }] },
-        { model: db.Chartshare }
+        { model: db.Chartshare },
+        { model: db.Alert },
       ],
       order: [[db.ChartDatasetConfig, "order", "ASC"]],
     };
@@ -329,7 +332,6 @@ class ChartController {
             );
           }
         });
-
         return Promise.all(requestPromises);
       })
       .then(async (datasets) => {
@@ -394,7 +396,8 @@ class ChartController {
               if (dataset?.conditions) {
                 const newConditions = dataset.conditions.map((c) => {
                   const optCondition = opt.conditions.find((o) => o.field === c.field);
-                  const values = (optCondition && optCondition.values) || [];
+                  let values = (optCondition && optCondition.values) || [];
+                  values = optCondition?.hideValues ? [] : values.slice(0, 100);
 
                   return { ...c, values };
                 });
@@ -485,7 +488,6 @@ class ChartController {
       })
       .then((url) => {
         const options = {
-          keepAlive: 1,
           connectTimeoutMS: 30000,
         };
         return mongoose.connect(url, options);
@@ -512,7 +514,6 @@ class ChartController {
     return this.connectionController.getConnectionUrl(connection_id)
       .then((url) => {
         const options = {
-          keepAlive: 1,
           connectTimeoutMS: 30000,
         };
         return mongoose.connect(url, options);
@@ -704,7 +705,16 @@ class ChartController {
       });
   }
 
-  findByShareString(shareString) {
+  async findByShareString(shareString, snapshot = false) {
+    if (snapshot) {
+      const chart = await db.Chart.findOne({ where: { snapshotToken: shareString } });
+      if (!chart) {
+        return Promise.reject("Chart not found");
+      }
+
+      return this.findById(chart.id);
+    }
+
     return db.Chartshare.findOne({ where: { shareString } })
       .then((share) => {
         return this.findById(share.chart_id);
@@ -776,6 +786,16 @@ class ChartController {
       .catch((err) => {
         return Promise.reject(err);
       });
+  }
+
+  async takeSnapshot(id) {
+    const chart = await this.findById(id);
+
+    if (!chart?.snapshotToken) {
+      return Promise.reject("Chart does not have a snapshot token");
+    }
+
+    return snapChart(chart.snapshotToken);
   }
 }
 

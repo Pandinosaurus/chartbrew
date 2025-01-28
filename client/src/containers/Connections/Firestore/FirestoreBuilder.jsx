@@ -3,16 +3,19 @@ import PropTypes from "prop-types";
 import { connect, useDispatch, useSelector } from "react-redux";
 import {
   Button,Spacer, Divider, Chip, Switch, Tooltip, Link, Checkbox, Input, Popover,
-  CircularProgress, Select, SelectItem, PopoverTrigger, PopoverContent,
-} from "@nextui-org/react";
+  Select, SelectItem, PopoverTrigger, PopoverContent,
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import _ from "lodash";
-import { toast } from "react-toastify";
-import uuid from "uuid/v4";
+import toast from "react-hot-toast";
+import { v4 as uuid } from "uuid";
 import { Calendar } from "react-date-range";
 import { format, formatISO } from "date-fns";
 import { enGB } from "date-fns/locale";
-import { LuAlertTriangle, LuCalendarDays, LuInfo, LuPlay, LuPlus, LuPlusCircle, LuRefreshCw, LuTrash, LuUndo, LuX, LuXCircle } from "react-icons/lu";
+import {
+  LuTriangleAlert, LuCalendarDays, LuInfo, LuPlay, LuPlus, LuCirclePlus,
+  LuRefreshCw, LuTrash, LuUndo, LuX, LuCircleX,
+} from "react-icons/lu";
 import { useParams } from "react-router";
 
 import "ace-builds/src-min-noconflict/mode-json";
@@ -28,7 +31,7 @@ import determineType from "../../../modules/determineType";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { runDataRequest, selectDataRequests } from "../../../slices/dataset";
 
 export const operators = [{
@@ -85,6 +88,10 @@ export const operators = [{
   The API Data Request builder
 */
 function FirestoreBuilder(props) {
+  const {
+    dataRequest, connection, onSave, onDelete,
+  } = props;
+
   const [firestoreRequest, setFirestoreRequest] = useState({
     query: "",
   });
@@ -103,16 +110,13 @@ function FirestoreBuilder(props) {
   const [limit, setLimit] = useState(0);
   const [orderBy, setOrderBy] = useState("");
   const [orderByDirection, setOrderByDirection] = useState("desc");
+  const [requestError, setRequestError] = useState("");
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
 
   const stateDrs = useSelector((state) => selectDataRequests(state, params.datasetId));
-
-  const {
-    dataRequest, onChangeRequest, connection, onSave, onDelete,
-  } = props;
 
   // on init effect
   useEffect(() => {
@@ -123,7 +127,6 @@ function FirestoreBuilder(props) {
   }, []);
 
   useEffect(() => {
-    onChangeRequest(firestoreRequest);
     if (connection?.id && !fullConnection?.id) {
       dispatch(getConnection({ team_id: params.teamId, connection_id: connection.id }))
         .then((data) => {
@@ -229,7 +232,7 @@ function FirestoreBuilder(props) {
               : o.type === "number" ? "primary"
                 : o.type === "string" ? "success"
                   : o.type === "boolean" ? "warning"
-                    : "neutral"
+                    : "default"
           },
         });
       }
@@ -244,7 +247,7 @@ function FirestoreBuilder(props) {
     }
   };
 
-  const _onTest = (request = firestoreRequest) => {
+  const _onTest = (request = firestoreRequest, resetCache = false) => {
     setRequestLoading(true);
 
     if (request === null) request = firestoreRequest;
@@ -256,8 +259,10 @@ function FirestoreBuilder(props) {
       orderByDirection,
     };
 
+    setFirestoreRequest(requestToSave);
+
     onSave(requestToSave).then(() => {
-      _onRunRequest();
+      _onRunRequest(resetCache);
     });
   };
 
@@ -281,9 +286,15 @@ function FirestoreBuilder(props) {
     });
   };
 
-  const _onRunRequest = () => {
+  const _onRunRequest = (resetCache) => {
     setIndexUrl("");
-    const getCache = !invalidateCache;
+    setRequestError("");
+    let getCache = !invalidateCache;
+
+    if (resetCache) {
+      getCache = false;
+    }
+
     dispatch(runDataRequest({
       team_id: params.teamId,
       dataset_id: params.datasetId,
@@ -294,15 +305,20 @@ function FirestoreBuilder(props) {
         if (data?.error) {
           setRequestLoading(false);
           toast.error("The request failed. Please check your request 🕵️‍♂️");
-          setResult(JSON.stringify(data.error, null, 2));
+          setRequestError(data.error?.message);
 
           if (data.error?.message && data.error.message.indexOf("COLLECTION_GROUP_ASC") > -1) {
             setIndexUrl(data.error.message.substring(data.error.message.indexOf("https://")));
           }
         }
         const result = data.payload;
+        if (result?.status?.statusCode >= 400) {
+          toast.error("The request failed. Please check your request 🕵️‍♂️");          
+          setRequestError(result.response);
+        }
         if (result?.response?.dataRequest?.responseData?.data) {
           setResult(JSON.stringify(result.response.dataRequest.responseData.data, null, 2));
+          _populateFieldOptions(result.response.dataRequest.responseData.data, "main");
         }
         setRequestLoading(false);
       })
@@ -340,7 +356,7 @@ function FirestoreBuilder(props) {
   };
 
   const _onChangeQuery = (query) => {
-    setFirestoreRequest({ ...firestoreRequest, query });
+    _onTest({ ...firestoreRequest, query }, true);
   };
 
   const _updateCondition = (id, data, type) => {
@@ -468,7 +484,7 @@ function FirestoreBuilder(props) {
       };
     }
 
-    _onTest(newRequest);
+    _onTest(newRequest, true);
   };
 
   const _onSelectSubCollection = (subCollection) => {
@@ -483,7 +499,7 @@ function FirestoreBuilder(props) {
   return (
     <div style={styles.container} className="pl-1 pr-1 md:pl-4 md:pr-4">
       <div className="grid grid-cols-12 gap-4">
-        <div className={`col-span-12 md:col-span-${showSubUI ? "4" : "6"} mb-4`}>
+        <div className={"col-span-12 md:col-span-7 mb-4"}>
           <Row justify="space-between" align="center">
             <Text b size={"lg"}>{connection.name}</Text>
             <div>
@@ -520,18 +536,19 @@ function FirestoreBuilder(props) {
           </Row>
           <Spacer y={4} />
           <Row>
-            <Text b>Select one of your collections:</Text>
+            <Text>Select one of your collections:</Text>
           </Row>
           <Spacer y={1} />
           <Row wrap="wrap" className="pl-0 firestorebuilder-collections-tut gap-1">
-            {collectionsLoading && <CircularProgress />}
             {collectionData?.length > 0 && collectionData?.map((collection) => (
               <Fragment key={collection._queryOptions.collectionId}>
                 <Chip
-                  variant={firestoreRequest.query !== collection._queryOptions.collectionId ? "bordered" : "solid"}
-                  color="primary"
+                  variant={firestoreRequest.query !== collection._queryOptions.collectionId ? "flat" : "solid"}
+                  color={firestoreRequest.query !== collection._queryOptions.collectionId ? "default" : "primary"}
                   onClick={() => _onChangeQuery(collection._queryOptions.collectionId)}
-                  className="min-w-[50px]"
+                  className="min-w-[50px] text-center cursor-pointer"
+                  radius="sm"
+                  size="lg"
                 >
                   {collection._queryOptions.collectionId}
                 </Chip>
@@ -541,14 +558,15 @@ function FirestoreBuilder(props) {
               <span className="text-sm italic">No collections found</span>
             )}
           </Row>
-          <Spacer y={1} />
+          <Spacer y={2} />
           <Row>
             <Button
               size="sm"
-              startContent={<LuRefreshCw />}
+              startContent={!collectionsLoading ? <LuRefreshCw size={16} /> : null}
               onClick={() => _onFetchCollections()}
               isLoading={collectionsLoading}
               variant="light"
+              color="primary"
             >
               Refresh collections
             </Button>
@@ -558,28 +576,8 @@ function FirestoreBuilder(props) {
           <Divider />
           <Spacer y={2} />
 
-          <Row>
-            <Text b>{"Data settings"}</Text>
-          </Row>
-          <Spacer y={1} />
-          <Row className="firestorebuilder-settings-tut" align="flex-start">
-            <Switch
-              onChange={_toggleSubCollections}
-              isSelected={
-                dataRequest.configuration && dataRequest.configuration.showSubCollections
-              }
-              size="sm"
-            >
-              Add sub-collections to the response
-            </Switch>
-          </Row>
-
-          <Spacer y={2} />
-          <Divider />
-          <Spacer y={2} />
-
           <Row align="center">
-            <Text b>
+            <Text>
               {"Filter the collection "}
             </Text>
             <Spacer x={1} />
@@ -611,7 +609,7 @@ function FirestoreBuilder(props) {
           <Divider />
           <Spacer y={2} />
           <Row className="firestorebuilder-query-tut">
-            <Text b>
+            <Text>
               {"Order and limit"}
             </Text>
           </Row>
@@ -634,6 +632,7 @@ function FirestoreBuilder(props) {
               selectionMode="single"
               label="Direction"
               size="sm"
+              aria-label="Select a direction"
             >
               <SelectItem key="desc" textValue="Descending">
                 Descending
@@ -655,108 +654,130 @@ function FirestoreBuilder(props) {
               size="sm"
             />
           </Row>
+
+          <Spacer y={2} />
+          <Divider />
+          <Spacer y={2} />
+
+          <Row>
+            <Text>{"Data settings"}</Text>
+          </Row>
+          <Spacer y={1} />
+          <Row className="firestorebuilder-settings-tut" align="flex-start">
+            <Switch
+              onChange={_toggleSubCollections}
+              isSelected={
+                firestoreRequest?.configuration?.showSubCollections
+              }
+              size="sm"
+            >
+              Add sub-collections to the response
+            </Switch>
+          </Row>
+
+          {showSubUI && dataRequest && dataRequest.configuration && (
+            <div className="mt-4">
+              <Divider />
+              <Spacer y={2} />
+              <Row>
+                <Text>Fetch sub-collection data only</Text>
+              </Row>
+              <Spacer y={1} />
+              <Row wrap="wrap" className={"gap-1 items-center"}>
+                {dataRequest.configuration.subCollections.map((subCollection) => (
+                  <Fragment key={subCollection}>
+                    <Chip
+                      color="secondary"
+                      variant={dataRequest.configuration.selectedSubCollection !== subCollection ? "bordered" : "solid"}
+                      onClick={() => _onSelectSubCollection(subCollection)}
+                      className="min-w-[50px] text-center cursor-pointer"
+                      radius="sm"
+                    >
+                      {subCollection}
+                    </Chip>
+                  </Fragment>
+                ))}
+
+                <Button
+                  color="danger"
+                  onClick={() => _onSelectSubCollection("")}
+                  startContent={<LuX />}
+                  disabled={!dataRequest.configuration.selectedSubCollection}
+                  variant="light"
+                  size="sm"
+                >
+                  Clear selection
+                </Button>
+              </Row>
+
+              <Spacer y={1} />
+              <Divider />
+              <Spacer y={1} />
+
+              {dataRequest.configuration.selectedSubCollection && (
+                <>
+                  <Row align="center">
+                    <Text>
+                      {"Filter the sub-collection "}
+                    </Text>
+                    <Spacer x={0.5} />
+                    <Tooltip
+                      content="These filters are applied on the sub-collection only."
+                    >
+                      <div><LuInfo /></div>
+                    </Tooltip>
+                  </Row>
+                  <Spacer y={1} />
+                  <Row>
+                    <Conditions
+                      conditions={
+                        conditions.filter((c) => (
+                          c.collection === dataRequest.configuration.selectedSubCollection
+                        ))
+                      }
+                      fieldOptions={subFieldOptions}
+                      onAddCondition={() => {
+                        _onAddCondition(dataRequest.configuration.selectedSubCollection);
+                      }}
+                      onApplyCondition={(id) => {
+                        _onApplyCondition(id, dataRequest.configuration.selectedSubCollection);
+                      }}
+                      onRevertCondition={_onRevertCondition}
+                      onRemoveCondition={_onRemoveCondition}
+                      updateCondition={_updateCondition}
+                      onChangeConditionValues={_onChangeConditionValues}
+                      collection={dataRequest.query}
+                    />
+                  </Row>
+                  {indexUrl && (
+                    <>
+                      <Spacer y={1} />
+                      <Divider />
+                      <Spacer y={1} />
+                      <Row>
+                        <Container className={"bg-blue-50 p-10 rounded-sm border-[2px] border-blue-300 border-solid"}>
+                          <Row>
+                            <Text h5>
+                              {"To be able to filter this sub-collection, you will need to set up an index."}
+                            </Text>
+                          </Row>
+                          <Row>
+                            <Text>
+                              <Link href={indexUrl} target="_blank" rel="noopener noreferrer">
+                                {"Click here to set it up in two clicks"}
+                              </Link>
+                            </Text>
+                          </Row>
+                        </Container>
+                      </Row>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
-        {showSubUI && dataRequest && dataRequest.configuration && (
-          <div className="col-span-12 md:col-span-4">
-            <Row>
-              <Text b>Fetch sub-collection data</Text>
-            </Row>
-            <Spacer y={1} />
-            <Row wrap="wrap" className={"gap-1"}>
-              {dataRequest.configuration.subCollections.map((subCollection) => (
-                <Fragment key={subCollection}>
-                  <Chip
-                    color="secondary"
-                    variant={dataRequest.configuration.selectedSubCollection !== subCollection ? "bordered" : "solid"}
-                    onClick={() => _onSelectSubCollection(subCollection)}
-                    className="min-w-[50px]"
-                  >
-                    {subCollection}
-                  </Chip>
-                </Fragment>
-              ))}
-            </Row>
-            <Spacer y={1} />
-            <Row>
-              <Button
-                color="danger"
-                onClick={() => _onSelectSubCollection("")}
-                startContent={<LuX />}
-                disabled={!dataRequest.configuration.selectedSubCollection}
-                variant="light"
-                size="sm"
-              >
-                Clear selection
-              </Button>
-            </Row>
-
-            <Spacer y={1} />
-            <Divider />
-            <Spacer y={1} />
-
-            {dataRequest.configuration.selectedSubCollection && (
-              <>
-                <Row align="center">
-                  <Text b>
-                    {"Filter the sub-collection "}
-                  </Text>
-                  <Spacer x={0.5} />
-                  <Tooltip
-                    content="These filters are applied on the sub-collection only."
-                  >
-                    <div><LuInfo /></div>
-                  </Tooltip>
-                </Row>
-                <Spacer y={1} />
-                <Row>
-                  <Conditions
-                    conditions={
-                      conditions.filter((c) => (
-                        c.collection === dataRequest.configuration.selectedSubCollection
-                      ))
-                    }
-                    fieldOptions={subFieldOptions}
-                    onAddCondition={() => {
-                      _onAddCondition(dataRequest.configuration.selectedSubCollection);
-                    }}
-                    onApplyCondition={(id) => {
-                      _onApplyCondition(id, dataRequest.configuration.selectedSubCollection);
-                    }}
-                    onRevertCondition={_onRevertCondition}
-                    onRemoveCondition={_onRemoveCondition}
-                    updateCondition={_updateCondition}
-                    onChangeConditionValues={_onChangeConditionValues}
-                    collection={dataRequest.query}
-                  />
-                </Row>
-                {indexUrl && (
-                  <>
-                    <Spacer y={1} />
-                    <Divider />
-                    <Spacer y={1} />
-                    <Row>
-                      <Container className={"bg-blue-50 p-10 rounded-sm border-[2px] border-blue-300 border-solid"}>
-                        <Row>
-                          <Text h5>
-                            {"To be able to filter this sub-collection, you will need to set up an index."}
-                          </Text>
-                        </Row>
-                        <Row>
-                          <Text>
-                            <Link href={indexUrl} target="_blank" rel="noopener noreferrer">
-                              {"Click here to set it up in two clicks"}
-                            </Link>
-                          </Text>
-                        </Row>
-                      </Container>
-                    </Row>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        )}
-        <div className={`col-span-12 md:col-span-${showSubUI ? "4" : "6"}`}>
+        <div className={"col-span-12 md:col-span-5"}>
           <Container>
             <Row className="firestorebuilder-request-tut">
               <Button
@@ -795,10 +816,11 @@ function FirestoreBuilder(props) {
                   style={{ borderRadius: 10 }}
                   height="450px"
                   width="none"
-                  value={result || ""}
+                  value={requestError || result || ""}
                   name="resultEditor"
                   readOnly
                   editorProps={{ $blockScrolling: false }}
+                  className="rounded-md border-1 border-solid border-content3"
                 />
               </div>
             </Row>
@@ -850,7 +872,7 @@ function Conditions(props) {
                 <Tooltip
                   content="This condition might not work on the current collection."
                 >
-                  <div><LuAlertTriangle className="text-secondary" /></div>
+                  <div><LuTriangleAlert className="text-secondary" /></div>
                 </Tooltip>
               )}
               <Select
@@ -860,6 +882,7 @@ function Conditions(props) {
                 onSelectionChange={(keys) => updateCondition(condition.id, keys.currentKey, "field")}
                 label="Field"
                 placeholder="Select a field"
+                aria-label="Select a field"
               >
                 {fieldOptions.map((option) => (
                   <SelectItem
@@ -884,6 +907,7 @@ function Conditions(props) {
                 selectionMode="single"
                 label="Operator"
                 placeholder="Select an operator"
+                aria-label="Select an operator"
               >
                 {operators.map((option) => (
                   <SelectItem key={option.value} textValue={option.key}>
@@ -951,7 +975,7 @@ function Conditions(props) {
                             form="condition-values"
                             size="sm"
                           >
-                            <LuPlusCircle />
+                            <LuCirclePlus />
                           </Button>
                         )}
                       />
@@ -961,7 +985,7 @@ function Conditions(props) {
                       {condition.values && condition.values.map((v) => (
                         <Chip
                           key={v}
-                          endContent={<LuXCircle />}
+                          endContent={<LuCircleX />}
                           size="sm"
                           onClick={() => _onRemoveConditionValue(condition, v)}
                           variant="faded"
@@ -985,8 +1009,9 @@ function Conditions(props) {
                       onClick={() => onApplyCondition(condition.id)}
                       size="sm"
                       variant="faded"
+                      color="success"
                     >
-                      <LuPlusCircle />
+                      <LuCirclePlus />
                     </Button>
                   </Tooltip>
                 </>
@@ -1019,7 +1044,7 @@ function Conditions(props) {
                   size="sm"
                   variant="faded"
                 >
-                  <LuXCircle />
+                  <LuCircleX />
                 </Button>
               </Tooltip>
             </Row>

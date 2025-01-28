@@ -2,10 +2,11 @@ import React, { useEffect, useState } from "react";
 import { connect, useDispatch, useSelector } from "react-redux";
 import { PropTypes } from "prop-types";
 import {
-  Button, CircularProgress, Divider, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, SelectItem, Spacer,
-} from "@nextui-org/react";
-import { ToastContainer, toast, Flip } from "react-toastify";
-import "react-toastify/dist/ReactToastify.min.css";
+  Autocomplete,
+  AutocompleteItem,
+  Button, CircularProgress, Divider, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spacer,
+} from "@heroui/react";
+import toast from "react-hot-toast";
 import { LuClock4, LuTrash, LuX } from "react-icons/lu";
 import { useNavigate } from "react-router";
 
@@ -16,7 +17,6 @@ import timezones from "../modules/timezones";
 import Callout from "../components/Callout";
 import Row from "../components/Row";
 import Text from "../components/Text";
-import useThemeDetector from "../modules/useThemeDetector";
 import Segment from "../components/Segment";
 import { selectTeam } from "../slices/team";
 
@@ -37,13 +37,11 @@ function ProjectSettings(props) {
   const [removeLoading, setRemoveLoading] = useState(false);
   const [removeError, setRemoveError] = useState(false);
   const [projectTimezone, setProjectTimezone] = useState("");
-  const [timezoneSearch, setTimezoneSearch] = useState("");
   const [loadingTimezone, setLoadingTimezone] = useState(false);
 
   const team = useSelector(selectTeam);
   const project = useSelector(selectProject);
 
-  const isDark = useThemeDetector();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -87,7 +85,7 @@ function ProjectSettings(props) {
     setRemoveError(false);
     dispatch(removeProject({ project_id: project.id }))
       .then(() => {
-        navigate("/user");
+        navigate("/");
       })
       .catch(() => {
         setRemoveLoading(false);
@@ -100,7 +98,6 @@ function ProjectSettings(props) {
     dispatch(updateProject({ project_id: project.id, data: { timezone: clear ? "" : projectTimezone } }))
       .then(() => {
         setProjectTimezone("");
-        setTimezoneSearch("");
         setLoadingTimezone(false);
         dispatch(changeActiveProject(project.id));
         toast.success("The timezone was updated successfully!");
@@ -114,7 +111,6 @@ function ProjectSettings(props) {
   const _onGetMachineTimezone = () => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setProjectTimezone(tz);
-    setTimezoneSearch("");
   };
 
   const _canAccess = (role) => {
@@ -122,7 +118,7 @@ function ProjectSettings(props) {
   };
 
   return (
-    <Segment style={style} className="container mx-auto mt-4 bg-background">
+    <Segment style={style} className="container mx-auto mt-4 bg-content1">
       <Row>
         <span className="text-lg font-bold">Dashboard settings</span>
       </Row>
@@ -155,7 +151,7 @@ function ProjectSettings(props) {
           <Button
             type="submit"
             color={success ? "success" : error ? "danger" : "primary"}
-            isDisabled={!_canAccess("projectAdmin")}
+            isDisabled={!_canAccess("projectEditor")}
             onClick={_onSaveName}
             isLoading={loading}
           >
@@ -169,32 +165,28 @@ function ProjectSettings(props) {
       <Spacer y={4} />
 
       <Row align="center" wrap={"wrap"}>
-        <Select
+        <Autocomplete
           label="Dashboard timezone"
           placeholder="Select a timezone"
           variant="bordered"
-          onSelectionChange={(keys) => {
-            setTimezoneSearch("");
-            setProjectTimezone(keys.currentKey);
+          onSelectionChange={(key) => {
+            setProjectTimezone(key);
           }}
-          selectedKeys={[projectTimezone || project.timezone]}
-          selectionMode="single"
+          selectedKey={projectTimezone || project.timezone}
           className="max-w-md"
+          aria-label="Timezone"
         >
-          {timezones
-            .filter((timezone) => (
-              timezone.toLowerCase().indexOf(timezoneSearch.toLocaleLowerCase()) > -1
-            )).map((timezone) => (
-              <SelectItem key={timezone} textValue={timezone}>
-                {timezone}
-              </SelectItem>
-            ))}
-        </Select>
+          {timezones.map((timezone) => (
+            <AutocompleteItem key={timezone} textValue={timezone}>
+              {timezone}
+            </AutocompleteItem>
+          ))}
+        </Autocomplete>
         <Spacer x={1} />
         <Button
           color="primary"
-          variant="bordered"
-          disabled={!_canAccess("projectAdmin")}
+          variant="light"
+          disabled={!_canAccess("projectEditor")}
           onClick={() => _onGetMachineTimezone()}
           startContent={<LuClock4 />}
         >
@@ -206,7 +198,7 @@ function ProjectSettings(props) {
       <Spacer y={2} />
       <Row>
         <Button
-          isDisabled={!_canAccess("projectAdmin")}
+          isDisabled={!_canAccess("projectEditor") || !projectTimezone || projectTimezone === project.timezone}
           onClick={() => _onSaveTimezone()}
           isLoading={loadingTimezone}
           color="primary"
@@ -218,7 +210,7 @@ function ProjectSettings(props) {
           <Button
             color="warning"
             variant="flat"
-            disabled={!_canAccess("projectAdmin")}
+            disabled={!_canAccess("projectEditor")}
             endContent={<LuX />}
             onClick={() => _onSaveTimezone(true)}
           >
@@ -288,20 +280,6 @@ function ProjectSettings(props) {
           </ModalFooter>
         </ModalContent>
       </Modal>
-
-      <ToastContainer
-        position="bottom-center"
-        autoClose={1500}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnVisibilityChange
-        draggable
-        pauseOnHover
-        transition={Flip}
-        theme={isDark ? "dark" : "light"}
-      />
     </Segment>
   );
 }

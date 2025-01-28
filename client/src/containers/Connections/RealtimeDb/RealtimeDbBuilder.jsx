@@ -3,9 +3,9 @@ import PropTypes from "prop-types";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Button, Input, Spacer, Divider, Chip, Checkbox, Tooltip,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { LuInfo, LuPlay, LuTrash, LuX } from "react-icons/lu";
 import { useParams } from "react-router";
 
@@ -16,7 +16,7 @@ import "ace-builds/src-min-noconflict/theme-one_dark";
 import { getConnection } from "../../../slices/connection";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { runDataRequest, selectDataRequests } from "../../../slices/dataset";
 
 /*
@@ -29,14 +29,14 @@ function RealtimeDbBuilder(props) {
   const [result, setResult] = useState("");
   const [requestSuccess, setRequestSuccess] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
-  const [requestError, setRequestError] = useState(false);
+  const [requestError, setRequestError] = useState("");
   const [projectId, setProjectId] = useState("");
   const [limitValue, setLimitValue] = useState(100);
   const [invalidateCache, setInvalidateCache] = useState(false);
   const [fullConnection, setFullConnection] = useState({});
   const [saveLoading, setSaveLoading] = useState(false);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
   const stateDrs = useSelector((state) => selectDataRequests(state, params.datasetId));
@@ -92,7 +92,7 @@ function RealtimeDbBuilder(props) {
   const _onTest = () => {
     setRequestLoading(true);
     setRequestSuccess(false);
-    setRequestError(false);
+    setRequestError("");
 
     onSave(firebaseRequest).then(() => {
       const getCache = !invalidateCache;
@@ -107,22 +107,25 @@ function RealtimeDbBuilder(props) {
             setRequestLoading(false);
             setRequestError(data.error);
             toast.error("The request failed. Please check your request 🕵️‍♂️");
-            setResult(JSON.stringify(data.error, null, 2));
+            setRequestError(data.error?.message || `${data.error}`);
             return;
           }
 
           const result = data.payload;
+          if (result?.status?.statusCode >= 400) {
+            setRequestError(result.response);
+          }
           if (result?.response?.dataRequest?.responseData?.data) {
             setResult(JSON.stringify(result.response.dataRequest.responseData.data, null, 2));
+            setRequestSuccess(result.status);
           }
           setRequestLoading(false);
-          setRequestSuccess(result.status);
         })
         .catch((error) => {
           setRequestLoading(false);
           setRequestError(error);
           toast.error("The request failed. Please check your request 🕵️‍♂️");
-          setResult(JSON.stringify(error, null, 2));
+          setRequestError(error.message || `${error}`);
         });
     });
   };
@@ -476,7 +479,7 @@ function RealtimeDbBuilder(props) {
                 theme={isDark ? "one_dark" : "tomorrow"}
                 height="450px"
                 width="none"
-                value={result || ""}
+                value={requestError || result || ""}
                 name="resultEditor"
                 readOnly
                 editorProps={{ $blockScrolling: false }}

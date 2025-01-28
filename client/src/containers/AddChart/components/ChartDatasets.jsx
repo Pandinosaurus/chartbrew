@@ -2,26 +2,28 @@ import React, { Fragment, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { connect, useDispatch, useSelector } from "react-redux";
 import { LuExternalLink, LuMinus, LuPlus, LuSearch } from "react-icons/lu";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import moment from "moment";
 
 import { createCdc, runQuery, selectChart } from "../../../slices/chart";
-import { Avatar, AvatarGroup, Button, Card, CardBody, CardFooter, CardHeader, Chip, Divider, Input, ScrollShadow, Spacer, Tab, Tabs } from "@nextui-org/react";
+import { Avatar, Button, Card, CardBody, CardFooter, CardHeader, Chip, Divider, Input, ScrollShadow, Spacer, Tab, Tabs, Tooltip } from "@heroui/react";
 import Text from "../../../components/Text";
 import Row from "../../../components/Row";
 import connectionImages from "../../../config/connectionImages";
-import { getDatasets, selectDatasets } from "../../../slices/dataset";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { getDatasets, selectDatasetsNoDrafts } from "../../../slices/dataset";
+import { useTheme } from "../../../modules/ThemeContext";
 import ChartDatasetConfig from "./ChartDatasetConfig";
 import { chartColors } from "../../../config/colors";
 import { selectTeam } from "../../../slices/team";
 import canAccess from "../../../config/canAccess";
+import { selectProjects } from "../../../slices/project";
 
 function ChartDatasets(props) {
-  const { projects, chartId, user } = props;
+  const { chartId, user } = props;
 
   const chart = useSelector((state) => selectChart(state, chartId));
-  const datasets = useSelector(selectDatasets) || [];
+  const datasets = useSelector(selectDatasetsNoDrafts) || [];
+  const projects = useSelector(selectProjects);
 
   const [datasetSearch, setDatasetSearch] = useState("");
   const [tag, setTag] = useState("project");
@@ -30,8 +32,9 @@ function ChartDatasets(props) {
 
   const dispatch = useDispatch();
   const params = useParams();
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const team = useSelector(selectTeam);
+  const navigate = useNavigate();
 
   const initRef = useRef(null);
 
@@ -42,7 +45,7 @@ function ChartDatasets(props) {
   }, []);
 
   useEffect(() => {
-    if (datasets?.length > 0 && !initRef.current) {
+    if (datasets?.length > 0 && !initRef.current && chart) {
       initRef.current = true;
       const projectDatasets = datasets.filter((d) => (
         !d.draft
@@ -112,16 +115,30 @@ function ChartDatasets(props) {
     <div>
       <Row align={"center"} className={"justify-between"}>
         <Text size="h4">Datasets</Text>
-        <Button
-          isIconOnly
-          variant="faded"
-          size="sm"
-          onClick={() => setAddMode(!addMode)}
-          className="chart-cdc-add"
-        >
-          {!addMode && (<LuPlus />)}
-          {addMode && (<LuMinus />)}
-        </Button>
+        <div className="flex flex-row gap-1 items-center">
+          {canAccess("teamAdmin", user.id, team?.TeamRoles) && (
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => navigate(`/${params.teamId}/dataset/new?create=true&project_id=${chart.project_id}&chart_id=${chart.id}`)}
+            >
+              Create dataset
+            </Button>
+          )}
+
+          {datasets.length > 0 && chart?.ChartDatasetConfigs.length > 0 && (
+            <Button
+              isIconOnly
+              variant="faded"
+              size="sm"
+              onClick={() => setAddMode(!addMode)}
+              className="chart-cdc-add"
+            >
+              {!addMode && <LuPlus />}
+              {addMode && <LuMinus />}
+            </Button>
+          )}
+        </div>
       </Row>
       <Spacer y={4} />
       <Divider />
@@ -137,7 +154,7 @@ function ChartDatasets(props) {
             variant="bordered"
           />
           <Spacer y={2} />
-          <Row align="center" className={"gap-1"}>
+          <div className="flex flex-row gap-1 items-center">
             <Chip
               color={tag === "project" ? "primary" : "default"}
               variant={tag === "project" ? "solid" : "bordered"}
@@ -158,8 +175,12 @@ function ChartDatasets(props) {
             </Chip>
             <Spacer x={1} />
             <Text size="sm">{`${_filteredDatasets().length} datasets found`}</Text>
-          </Row>
+          </div>
           <Spacer y={4} />
+
+          {datasets.length === 0 && (
+            <div>No datasets available.</div>
+          )}
 
           <ScrollShadow className="max-h-[500px] w-full">
             {datasets.length > 0 && _filteredDatasets().map((dataset, index) => (
@@ -183,15 +204,18 @@ function ChartDatasets(props) {
                             ))}
                           </div>
                         </div>
-                        <AvatarGroup size="sm" isBordered>
+                        <div className="flex flex-row items-center gap-1">
                           {dataset?.DataRequests?.map((dr) => (
-                            <Avatar
-                              key={dr.id}
-                              src={connectionImages(isDark)[dr?.Connection?.subType]}
-                              isBordered
-                            />
+                            <Tooltip content={dr?.Connection?.name} key={dr.id}>
+                              <Avatar
+                                key={dr.id}
+                                src={connectionImages(isDark)[dr?.Connection?.subType]}
+                                isBordered
+                                size="sm"
+                              />
+                            </Tooltip>
                           ))}
-                        </AvatarGroup>
+                        </div>
                       </div>                      
                     </div>
                   </CardHeader>
@@ -235,6 +259,23 @@ function ChartDatasets(props) {
           <Spacer y={8} />
         </>
       )}
+
+      {datasets.length === 0 && canAccess("teamAdmin", user.id, team?.TeamRoles) && (
+        <div>
+          <Spacer y={4} />
+          <Divider />
+          <Spacer y={4} />
+          <Text>No datasets found. Create a dataset to get started.</Text>
+          <Spacer y={4} />
+          <Button
+            color="primary"
+            onClick={() => navigate(`/${params.teamId}/dataset/new?create=true&project_id=${chart.project_id}&chart_id=${chart.id}`)}
+            fullWidth
+          >
+            Create dataset
+          </Button>
+        </div>
+      )}
       
       {chart?.ChartDatasetConfigs.length > 0 && (
         <div>
@@ -245,7 +286,11 @@ function ChartDatasets(props) {
           >
             {chart?.ChartDatasetConfigs.map((cdc) => (
               <Tab title={`${cdc.legend}`} key={cdc.id}>
-                <ChartDatasetConfig chartId={chartId} datasetId={cdc.id} />
+                <ChartDatasetConfig
+                  chartId={chartId}
+                  datasetId={cdc.id}
+                  dataRequests={datasets.find((d) => d.id === cdc.dataset_id)?.DataRequests}
+                />
               </Tab>
             ))}
           </Tabs>
@@ -257,12 +302,10 @@ function ChartDatasets(props) {
 
 ChartDatasets.propTypes = {
   chartId: PropTypes.number.isRequired,
-  projects: PropTypes.array.isRequired,
   user: PropTypes.object.isRequired,
 };
 
 const mapStateToProps = (state) => ({
-  projects: state.project.data,
   user: state.user.data,
 });
 

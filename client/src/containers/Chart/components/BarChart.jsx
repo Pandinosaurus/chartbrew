@@ -4,18 +4,18 @@ import { Bar } from "react-chartjs-2";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, BarElement,
-  Title, Tooltip, Legend, Filler,
+  Title, Tooltip, Legend, Filler, LogarithmicScale,
 } from "chart.js";
-import { semanticColors } from "@nextui-org/react";
+import { semanticColors } from "@heroui/react";
 import { cloneDeep } from "lodash";
 
 import KpiChartSegment from "./KpiChartSegment";
 import ChartErrorBoundary from "./ChartErrorBoundary";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { getHeightBreakpoint, getWidthBreakpoint } from "../../../modules/layoutBreakpoints";
 
 ChartJS.register(
-  CategoryScale, LinearScale, PointElement, BarElement, Title, Tooltip, Legend, Filler
+  CategoryScale, LinearScale, LogarithmicScale, PointElement, BarElement, Title, Tooltip, Legend, Filler
 );
 
 function BarChart(props) {
@@ -23,7 +23,8 @@ function BarChart(props) {
     chart, redraw, redrawComplete, editMode,
   } = props;
 
-  const theme = useThemeDetector() ? "dark" : "light";
+  const { isDark } = useTheme();
+  const theme = isDark ? "dark" : "light";
   const chartRef = useRef(null);
 
   useEffect(() => {

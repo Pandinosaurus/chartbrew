@@ -7,7 +7,7 @@ import { useWindowSize } from "react-use";
 import {
   CircularProgress,
   Spacer,
-} from "@nextui-org/react";
+} from "@heroui/react";
 
 import "allotment/dist/style.css";
 
@@ -77,6 +77,7 @@ function ProjectBoard(props) {
   const _init = (id) => {
     _getProject(id);
     dispatch(getProjectCharts({ project_id: id || params.projectId }));
+    window.localStorage.setItem("__cb_active_team", team.id);
   };
 
   const _getProject = (id) => {
@@ -88,6 +89,7 @@ function ProjectBoard(props) {
       .then(() => {
         dispatch(getTeamMembers({ team_id: teamId }));
         dispatch(getProjects({ team_id: teamId }));
+        window.localStorage.setItem("__cb_active_team", teamId);
         return dispatch(getProject({ project_id: projectId }));
       })
       .then(() => {
@@ -146,7 +148,7 @@ function ProjectBoard(props) {
       <Container style={styles.container}>
         <Spacer y={10} />
         <Row align="center" justify="center">
-          <CircularProgress color="primary" size="xl" />
+          <CircularProgress color="primary" size="xl" aria-label="Loading the dashboard" />
         </Row>
         <Spacer y={3} />
         <Row align="center" justify="center">

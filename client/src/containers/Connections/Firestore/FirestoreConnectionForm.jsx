@@ -4,7 +4,7 @@ import React, {
 import PropTypes from "prop-types";
 import {
   Button, Input, Link, Spacer, Chip, semanticColors, Accordion, AccordionItem, Divider,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
 import { useDropzone } from "react-dropzone";
 
@@ -16,7 +16,7 @@ import { blue } from "../../../config/colors";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router";
 import { testRequest } from "../../../slices/connection";
@@ -39,7 +39,7 @@ function FirestoreConnectionForm(props) {
   const [jsonVisible, setJsonVisible] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const dispatch = useDispatch();
   const params = useParams();
 
@@ -198,7 +198,7 @@ function FirestoreConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 shadow-md border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 shadow-md border-1 border-solid border-content3 rounded-lg">
       <div>
         <p className="font-semibold">
           {!editConnection && "Connect to Firestore"}
@@ -354,7 +354,7 @@ function FirestoreConnectionForm(props) {
             <Spacer y={1} />
             <AceEditor
               mode="json"
-              theme="tomorrow"
+              theme={isDark ? "one_dark" : "tomorrow"}
               height="150px"
               width="none"
               value={testResult.body || "Hello"}

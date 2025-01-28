@@ -4,9 +4,9 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   Button, Checkbox, Divider, Input, Link, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Popover, PopoverContent, PopoverTrigger, Spacer,
   Tooltip,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import AceEditor from "react-ace";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { LuCheck, LuChevronRight, LuInfo, LuPencilLine, LuPlay, LuPlus, LuTrash } from "react-icons/lu";
 import { useParams } from "react-router";
 
@@ -19,7 +19,7 @@ import SavedQueries from "../../../components/SavedQueries";
 import Container from "../../../components/Container";
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { runDataRequest, selectDataRequests } from "../../../slices/dataset";
 
 /*
@@ -36,16 +36,16 @@ function MongoQueryBuilder(props) {
   const [updatingSavedQuery, setUpdatingSavedQuery] = useState(false);
   const [savingQuery, setSavingQuery] = useState(false);
   const [testSuccess, setTestSuccess] = useState(false);
-  const [testError, setTestError] = useState(false);
+  const [testError, setTestError] = useState("");
   const [testingQuery, setTestingQuery] = useState(false);
   const [result, setResult] = useState("");
   const [mongoRequest, setMongoRequest] = useState({
-    query: "collection('users').find()",
+    query: "collection('your_collection').find().limit(100)",
   });
   const [invalidateCache, setInvalidateCache] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const params = useParams();
   const dispatch = useDispatch();
   const stateDrs = useSelector((state) => selectDataRequests(state, params.datasetId));
@@ -145,11 +145,14 @@ function MongoQueryBuilder(props) {
           }
 
           const result = data.payload;
+          if (result?.status?.statusCode >= 400) {
+            setTestError(result.response);
+          }
           if (result?.response?.dataRequest?.responseData?.data) {
             setResult(JSON.stringify(result.response.dataRequest.responseData.data, null, 2));
+            setTestSuccess(true);
           }
           setTestingQuery(false);
-          setTestSuccess(result.status);
         })
         .catch((error) => {
           setTestingQuery(false);
@@ -332,7 +335,7 @@ function MongoQueryBuilder(props) {
                 theme={isDark ? "one_dark" : "tomorrow"}
                 height="450px"
                 width="none"
-                value={result || ""}
+                value={testError || result || ""}
                 name="resultEditor"
                 readOnly
                 editorProps={{ $blockScrolling: false }}

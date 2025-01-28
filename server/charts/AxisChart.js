@@ -8,6 +8,8 @@ const PieChart = require("./PieChart");
 const determineType = require("../modules/determineType");
 const dataFilter = require("./dataFilter");
 
+const checkNumbersOnlyAndLength = /^\d{10,13}$/;
+
 momentObj.suppressDeprecationWarnings = true;
 
 const parser = new FormulaParser();
@@ -37,6 +39,7 @@ class AxisChart {
       y: [],
     };
     this.dateFormat = "";
+    this.removeYear = false;
     this.timezone = timezone;
     if (this.timezone) {
       this.moment = (...args) => momentObj(...args).tz(this.timezone);
@@ -113,20 +116,33 @@ class AxisChart {
         let xType;
         let xAxisData = [];
         let yAxisData = [];
+        let alreadyDateFiltered = false;
 
-        const filterData = dataFilter(dataset.data, xAxis, dataset.options.conditions);
+        const filterData = dataFilter(
+          dataset.data, xAxis, dataset.options.conditions, this.timezone, this.chart.timeInterval
+        );
         if (filterData.conditionsOptions) {
           conditionsOptions.push({
             dataset_id: dataset.options.id,
             conditions: filterData.conditionsOptions,
           });
         }
+
+        if (filters && filters.length > 0) {
+          filters.forEach((filter) => {
+            if (filter.field === dateField && filter.exposed && filter.value) {
+              alreadyDateFiltered = true;
+            }
+          });
+        }
+
         let filteredData = filterData.data;
 
-        const dateDashboardFilter = filters?.find((f) => f.type === "date");
+        const dateDashboardFilter = filters && filters?.find((f) => f.type === "date");
         if (dateField
           && ((this.chart.startDate && this.chart.endDate) || dateDashboardFilter)
           && canDateFilter
+          && !alreadyDateFiltered
         ) {
           if (filters?.length > 0) {
             if (dateDashboardFilter) {
@@ -145,7 +161,9 @@ class AxisChart {
             operator: "lessOrEqual",
           }];
 
-          filteredData = dataFilter(filteredData, dateField, dateConditions, this.timezone).data;
+          filteredData = dataFilter(
+            filteredData, dateField, dateConditions, this.timezone, this.chart.timeInterval
+          ).data;
         }
 
         if (filters && filters.length > 0) {
@@ -159,7 +177,9 @@ class AxisChart {
 
             if (found) {
               filters.map((filter) => {
-                filteredData = dataFilter(filteredData, filter.field, filters).data;
+                filteredData = dataFilter(
+                  filteredData, filter.field, filters, this.timezone, this.chart.timeInterval
+                ).data;
                 return filter;
               });
             }
@@ -257,7 +277,7 @@ class AxisChart {
           yData.forEach((item, index) => {
             const yValue = _.get(item, yAxis);
             if (yValue || yValue === 0) {
-              yType = determineType(yValue);
+              yType = determineType(yValue, yAxisOperation);
               // only add the yValue if it corresponds to one of the x values found above
               const selectorValue = xAxis.indexOf(".") > -1 ? _.get(yData[index], xAxis) : yData[index][xAxisFieldName];
 
@@ -275,7 +295,7 @@ class AxisChart {
               } else if (yAxis && yAxis.split("[]").length > 1) {
                 const nestedArray = _.get(item, yAxis.split("[]")[0]);
                 const arrayField = _.get(nestedArray[0], yAxis.split("[]")[1].slice(1));
-                yType = determineType(arrayField);
+                yType = determineType(arrayField, yAxisOperation);
               }
               yAxisData.push({ x: xAxisData.filtered[index], y: newItem });
             }
@@ -420,8 +440,12 @@ class AxisChart {
             const newY = [];
             this.axisData.y[yLength].map((item, index) => {
               let formattedItem = item;
-              if (determineType(item) === "number") {
-                formattedItem = parseFloat(item);
+              try {
+                if (determineType(item) === "number" || determineType(item) === "string") {
+                  formattedItem = parseFloat(item);
+                }
+              } catch (e) {
+                // do nothing
               }
 
               if (index > 0) {
@@ -623,6 +647,13 @@ class AxisChart {
       }
     });
 
+    // remove the year from the labels
+    if (this.removeYear) {
+      newLabels = newLabels.map((label) => {
+        return label.replace(/\b\d{4}\b/g, "").trim();
+      });
+    }
+
     configuration.data.datasets = newDatasets;
     configuration.data.labels = newLabels;
     // calculate the growth values
@@ -737,15 +768,12 @@ class AxisChart {
     let pairedData = [];
     data.forEach((item, index) => {
       let xItem;
-      if (
-        item
-        && parseInt(item, 10).toString() === item.toString()
-        && item.toString().length === 10
-      ) {
+      const stringItem = (item && item.toString()) || "";
+      if (stringItem && checkNumbersOnlyAndLength.test(stringItem)) {
         if (this.timezone) {
-          xItem = this.moment(item, "X");
+          xItem = this.moment(stringItem, stringItem.length === 10 ? "X" : "x");
         } else {
-          xItem = momentObj.utc(item, "X");
+          xItem = momentObj.utc(stringItem, stringItem.length === 10 ? "X" : "x");
         }
       } else if (item) {
         if (this.timezone) {
@@ -760,10 +788,12 @@ class AxisChart {
 
     pairedData = pairedData.sort((a, b) => a.xItem && b.xItem && a.xItem.diff(b.xItem));
     axisData = pairedData.map((item) => item.xItem);
+    axisData = axisData.filter((item) => !!item);
 
     finalData.yData = pairedData.map((item) => item.yItem);
 
     finalData.filtered = _.cloneDeep(axisData);
+    finalData.filtered = finalData.filtered.filter((item) => !!item);
     finalData.timestamps = finalData.filtered.map((item) => item.valueOf());
     finalData.filtered = finalData.filtered.map((item) => item.format());
 
@@ -779,7 +809,8 @@ class AxisChart {
             this.dateFormat = "YYYY/MM/DD HH:mm:ss";
             axisData[i] = axisData[i].format(this.dateFormat);
           } else if (startDate.month() !== endDate.month()) {
-            this.dateFormat = "MMM Do HH:mm:ss";
+            this.dateFormat = "YYYY MMM Do HH:mm:ss";
+            this.removeYear = true;
             axisData[i] = axisData[i].format(this.dateFormat);
           } else if (startDate.week() !== endDate.week()
             && this.moment().week() !== startDate.week()
@@ -804,7 +835,8 @@ class AxisChart {
             this.dateFormat = "YYYY/MM/DD HH:mm";
             axisData[i] = axisData[i].format(this.dateFormat);
           } else if (startDate.month() !== endDate.month()) {
-            this.dateFormat = "MMM Do HH:mm";
+            this.dateFormat = "YYYY MMM Do HH:mm";
+            this.removeYear = true;
             axisData[i] = axisData[i].format(this.dateFormat);
           } else if (startDate.week() !== endDate.week()
             && this.moment().week() !== startDate.week()
@@ -829,7 +861,8 @@ class AxisChart {
             this.dateFormat = "YYYY/MM/DD hA";
             axisData[i] = axisData[i].format(this.dateFormat);
           } else if (startDate.month() !== endDate.month()) {
-            this.dateFormat = "MMM Do hA";
+            this.dateFormat = "YYYY MMM Do hA";
+            this.removeYear = true;
             axisData[i] = axisData[i].format(this.dateFormat);
           } else {
             this.dateFormat = "ddd Do hA";
@@ -845,7 +878,8 @@ class AxisChart {
             this.dateFormat = "YYYY MMM D";
             axisData[i] = axisData[i].format(this.dateFormat);
           } else {
-            this.dateFormat = "MMM D";
+            this.dateFormat = "YYYY MMM D";
+            this.removeYear = true;
             axisData[i] = axisData[i].format(this.dateFormat);
           }
           break;
@@ -872,7 +906,8 @@ class AxisChart {
             this.dateFormat = "MMM YYYY";
             axisData[i] = axisData[i].format(this.dateFormat);
           } else {
-            this.dateFormat = "MMM";
+            this.dateFormat = "MMM YYYY";
+            this.removeYear = true;
             axisData[i] = axisData[i].format(this.dateFormat);
           }
           break;
@@ -881,7 +916,7 @@ class AxisChart {
           axisData[i] = axisData[i].format(this.dateFormat);
           break;
         default:
-          this.dateFormat = "MMM D";
+          this.dateFormat = "YYYY MMM D";
           axisData[i] = axisData[i].format(this.dateFormat);
           break;
       }
@@ -983,7 +1018,9 @@ class AxisChart {
         }
       } else {
         finalItem = finalItem[yData[key].length - 1];
-        if (op === "sum" && yType === "number") finalItem = _.reduce(yData[key], (sum, n) => sum + (n instanceof Object ? 0 : n), 0);
+        if (op === "sum" && yType === "number") {
+          finalItem = _.reduce(yData[key], (sum, n) => sum + (n instanceof Object ? 0 : n), 0);
+        }
         if (op === "avg" && yType === "number") {
           if (averageByTotal) {
             totalNumberOfItems += yData[key].length;

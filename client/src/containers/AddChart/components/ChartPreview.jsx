@@ -3,14 +3,14 @@ import PropTypes from "prop-types";
 import { connect } from "react-redux";
 import {
   Button, Checkbox, Chip, CircularProgress, Divider, Link, Popover, PopoverContent, PopoverTrigger, Skeleton, Spacer, Tooltip,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import {
   TbChartBar, TbChartDonut4, TbChartLine, TbChartPie2, TbChartRadar, TbHash, TbMathAvg,
 } from "react-icons/tb";
 import { TiChartPie } from "react-icons/ti";
 import { FaChartLine } from "react-icons/fa";
 import { BsTable } from "react-icons/bs";
-import { LuInfo, LuListFilter, LuRefreshCw, LuXCircle } from "react-icons/lu";
+import { LuInfo, LuListFilter, LuRefreshCw, LuCircleX } from "react-icons/lu";
 import { findIndex } from "lodash";
 
 import LineChart from "../../Chart/components/LineChart";
@@ -46,7 +46,7 @@ function ChartPreview(props) {
   const _checkIfFilters = () => {
     let filterCount = 0;
     chart.ChartDatasetConfigs.forEach((d) => {
-      if (d.Dataset?.conditions) {
+      if (Array.isArray(d.Dataset?.conditions)) {
         filterCount += d.Dataset.conditions.filter((c) => c.exposed).length;
       }
     });
@@ -197,7 +197,7 @@ function ChartPreview(props) {
                       size="sm"
                       endContent={(
                         <Link onClick={() => _onClearFilter(c)} className="text-default-500 flex items-center">
-                          <LuXCircle size={14} />
+                          <LuCircleX size={14} />
                         </Link>
                       )}
                     >
@@ -412,7 +412,7 @@ function ChartPreview(props) {
             {chartLoading && (
               <>
                 <Row>
-                  <CircularProgress size="lg" />
+                  <CircularProgress size="lg" aria-label="Loading chart data" />
                 </Row>
                 <Row>
                   <Text b>Loading chart data...</Text>

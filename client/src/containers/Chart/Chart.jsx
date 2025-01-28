@@ -6,19 +6,23 @@ import {
   Card, Spacer, Tooltip, Dropdown, Button, Modal, Input, Link as LinkNext,
   Textarea, Switch, Popover, Chip, CardHeader, CircularProgress, PopoverTrigger,
   PopoverContent, DropdownMenu, DropdownTrigger, DropdownItem, ModalHeader,
-  ModalBody, ModalFooter, CardBody, ModalContent, Select, SelectItem,
-} from "@nextui-org/react";
+  ModalBody, ModalFooter, CardBody, ModalContent, Select, SelectItem, RadioGroup, Radio,
+  Badge,
+  Divider,
+  Kbd,
+} from "@heroui/react";
 import {
-  LuCalendarClock, LuCheck, LuChevronDown, LuClipboard, LuClipboardCheck, LuFileDown,
-  LuLayoutDashboard, LuLink, LuListFilter, LuLock, LuMoreHorizontal, LuMoreVertical,
-  LuPlus, LuRefreshCw, LuSettings, LuShare, LuTrash, LuTv2, LuUnlock, LuX, LuXCircle
+  LuBell,
+  LuCalendarClock, LuCheck, LuChevronDown, LuClipboard, LuClipboardCheck, LuEllipsis, LuEllipsisVertical, LuFileDown,
+  LuLayoutDashboard, LuLink, LuListFilter, LuLock, LuLockOpen,
+  LuPlus, LuRefreshCw, LuSettings, LuShare, LuTrash, LuMonitor, LuMonitorX, LuX,
+  LuCircleCheck,
 } from "react-icons/lu";
 
 import moment from "moment";
 import _ from "lodash";
-import { enGB } from "date-fns/locale";
-import { format } from "date-fns";
 import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 
 import {
   removeChart, runQuery, runQueryWithFilters, getChart, exportChart,
@@ -38,6 +42,9 @@ import useInterval from "../../modules/useInterval";
 import Row from "../../components/Row";
 import Text from "../../components/Text";
 import KpiMode from "./components/KpiMode";
+import useChartSize from "../../modules/useChartSize";
+import DatasetAlerts from "../AddChart/components/DatasetAlerts";
+import isMac from "../../modules/isMac";
 
 const getFiltersFromStorage = (projectId) => {
   try {
@@ -55,6 +62,7 @@ function Chart(props) {
   const {
     team, user, chart, isPublic, print, height,
     showExport, password, editingLayout, onEditLayout,
+    variables,
   } = props;
 
   const params = useParams();
@@ -82,6 +90,10 @@ function Chart(props) {
   const [customUpdateFreq, setCustomUpdateFreq] = useState("");
   const [autoUpdateError, setAutoUpdateError] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
+  const [embedTheme, setEmbedTheme] = useState("");
+  const [alertsModal, setAlertsModal] = useState(false);
+  const [alertsDatasetId, setAlertsDatasetId] = useState(null);
+  const chartSize = useChartSize(chart.layout);
 
   useInterval(() => {
     dispatch(getChart({
@@ -90,7 +102,13 @@ function Chart(props) {
       password: isPublic ? window.localStorage.getItem("reportPassword") : null,
       fromInterval: true
     }));
-  }, chart.autoUpdate ? chart.autoUpdate * 1000 : null);
+
+    if (params.projectId) {
+      _runFiltering(getFiltersFromStorage(params.projectId));
+    } else {
+      _runFiltering();
+    }
+  }, chart.autoUpdate > 0 && chart.autoUpdate < 600 ? chart.autoUpdate * 1000 : 600000);
 
   useEffect(() => {
     setIframeCopied(false);
@@ -114,21 +132,19 @@ function Chart(props) {
   const _onGetChartData = () => {
     const { projectId } = params;
 
+    const skipStateUpdate = getFiltersFromStorage(projectId)?.length > 0;
+
     setChartLoading(true);
-    dispatch(runQuery({ project_id: projectId, chart_id: chart.id }))
+    dispatch(runQuery({ project_id: projectId, chart_id: chart.id, skipStateUpdate }))
       .then(() => {
         setChartLoading(false);
 
         setDashboardFilters(getFiltersFromStorage(projectId));
-        setTimeout(() => {
-          if (dashboardFilters && _chartHasFilter()) {
-            dispatch(runQueryWithFilters({
-              project_id: chart.project_id,
-              chart_id: chart.id,
-              filters: dashboardFilters,
-            }));
-          }
-        }, 100);
+        if (getFiltersFromStorage(projectId) && _chartHasFilter()) {
+          _runFiltering(getFiltersFromStorage(projectId));
+        } else {
+          _runFiltering();
+        }
       })
       .catch((error) => {
         if (error === 413) {
@@ -138,6 +154,47 @@ function Chart(props) {
           setError(true);
         }
       });
+  };
+
+  const _runFiltering = async (filters) => {
+    if (filters) {
+      await dispatch(runQueryWithFilters({
+        project_id: chart.project_id,
+        chart_id: chart.id,
+        filters,
+      }));
+    }
+
+    // if variables exist, run query again with variables
+    if (variables?.[params.projectId]) {
+      // check if any filters have the same variable name and run query with filters
+      chart.ChartDatasetConfigs.forEach((cdc) => {
+        if (Array.isArray(cdc.Dataset?.conditions)) {
+          const newConditions = [];
+          variables[params.projectId].forEach((variable) => {
+            const found = cdc.Dataset.conditions.find((c) => c.variable === variable.variable);
+            if (found) {
+              newConditions.push({
+                ...found,
+                value: variable.value,
+              });
+            }
+          });
+
+          if (newConditions.length > 0) {
+            dispatch(runQueryWithFilters({
+              project_id: chart.project_id,
+              chart_id: chart.id,
+              filters: newConditions,
+            }));
+          }
+        }
+      });
+    }
+  };
+
+  const _onGetChart = () => {
+    dispatch(getChart({ project_id: params.projectId, chart_id: chart.id }));
   };
 
   const _onDeleteChartConfirmation = () => {
@@ -223,6 +280,11 @@ function Chart(props) {
   const _openUpdateModal = () => {
     setUpdateModal(true);
     setUpdateFrequency(chart.autoUpdate);
+  };
+
+  const _openAlertsModal = () => {
+    setAlertsModal(true);
+    setAlertsDatasetId(chart?.ChartDatasetConfigs?.[0]?.id);
   };
 
   const _getUpdateFreqText = (value) => {
@@ -311,7 +373,7 @@ function Chart(props) {
   const _checkIfFilters = () => {
     let filterCount = 0;
     chart.ChartDatasetConfigs.forEach((d) => {
-      if (d.Dataset?.conditions) {
+      if (Array.isArray(d.Dataset?.conditions)) {
         filterCount += d.Dataset.conditions.filter((c) => c.exposed).length;
       }
     });
@@ -385,11 +447,7 @@ function Chart(props) {
     if (!found) newConditions.push(condition);
     setConditions(newConditions);
 
-    dispatch(runQueryWithFilters({
-      project_id: chart.project_id,
-      chart_id: chart.id,
-      filters: newConditions
-    }));
+    _runFiltering(newConditions);
   };
 
   const _onClearFilter = (condition) => {
@@ -398,29 +456,39 @@ function Chart(props) {
     if (clearIndex > -1) newConditions.splice(clearIndex, 1);
 
     setConditions(newConditions);
-    dispatch(runQueryWithFilters({
-      project_id: chart.project_id,
-      chart_id: chart.id,
-      filters: newConditions
-    }));
+    _runFiltering(newConditions);
   };
 
   const _getEmbedUrl = () => {
     if (!chart.Chartshares || !chart.Chartshares[0]) return "";
     const shareString = chart.Chartshares && chart.Chartshares[0].shareString;
-    return `${SITE_HOST}/chart/${shareString}/embedded`;
+    return `${SITE_HOST}/chart/${shareString}/embedded${embedTheme ? `?theme=${embedTheme}` : ""}`;
   };
 
   const _getEmbedString = () => {
     if (!chart.Chartshares || !chart.Chartshares[0]) return "";
     const shareString = chart.Chartshares && chart.Chartshares[0].shareString;
-    return `<iframe src="${SITE_HOST}/chart/${shareString}/embedded" allowTransparency="true" width="700" height="300" scrolling="no" frameborder="0" style="background-color: #ffffff"></iframe>`;
+    return `<iframe src="${SITE_HOST}/chart/${shareString}/embedded${embedTheme ? `?theme=${embedTheme}` : ""}" allowTransparency="true" width="700" height="300" scrolling="no" frameborder="0" style="background-color: #ffffff"></iframe>`;
   };
 
   const _onCreateSharingString = async () => {
     setShareLoading(true);
     await dispatch(createShareString({ project_id: params.projectId, chart_id: chart.id }));
     setShareLoading(false);
+  };
+
+  const _onPublishChart = async () => {
+    const res = await dispatch(updateChart({
+      project_id: params.projectId,
+      chart_id: chart.id,
+      data: { draft: false },
+    }));
+
+    if (res.error) {
+      toast.error("There was a problem publishing your chart");
+    } else {
+      toast.success("Chart published successfully");
+    }
   };
 
   const { projectId } = params;
@@ -439,47 +507,25 @@ function Chart(props) {
       {chart && (
         <Card
           shadow="none"
-          className={`h-full bg-content1 border-solid border-1 border-content3 ${print && "min-h-[350px] shadow-none border-solid border-1 border-content4"}`}
+          className={`h-full bg-content1 border-solid border-1 border-divider ${print && "min-h-[350px] shadow-none border-solid border-1 border-content4"}`}
         >
           <CardHeader className="pb-0 grid grid-cols-12 items-start">
             <div className="col-span-6 sm:col-span-8 flex items-start justify-start">
               <div>
-                <Row justify="flex-start" align="center">
+                <Row align="center" className={"flex-wrap gap-1"}>
                   {chart.draft && (
-                    <>
-                      <Chip color="secondary" variant="flat" size="sm">Draft</Chip>
-                      <Spacer x={1} />
-                    </>
+                    <Chip color="secondary" variant="flat" size="sm">Draft</Chip>
                   )}
                   <>
-                    {_canAccess("projectAdmin") && !editingLayout && (
+                    {_canAccess("projectEditor") && !editingLayout && (
                       <Link to={`/${params.teamId}/${params.projectId}/chart/${chart.id}/edit`}>
                         <Text b className={"text-default"}>{chart.name}</Text>
                       </Link>
                     )}
-                    {(!_canAccess("projectAdmin") || editingLayout) && (
+                    {(!_canAccess("projectEditor") || editingLayout) && (
                       <Text b>{chart.name}</Text>
                     )}
                   </>
-                  <Spacer x={0.5} />
-                  {chart.ChartDatasetConfigs && conditions.map((c) => (
-                    <Chip
-                      color="primary"
-                      variant={"flat"}
-                      key={c.id}
-                      size="sm"
-                      endContent={(
-                        <LinkNext onClick={() => _onClearFilter(c)} className="text-default-500 flex items-center">
-                          <LuXCircle size={14} />
-                        </LinkNext>
-                      )}
-                    >
-                      <Text size="sm">
-                        {c.type !== "date" && `${c.value}`}
-                        {c.type === "date" && format(new Date(c.value), "Pp", { locale: enGB })}
-                      </Text>
-                    </Chip>
-                  ))}
                 </Row>
                 {chart.chartData && (
                   <Row justify="flex-start" align="center" className={"gap-1"}>
@@ -490,7 +536,7 @@ function Chart(props) {
                     )}
                     {(chartLoading || chart.loading) && (
                       <>
-                        <CircularProgress classNames={{ svg: "w-4 h-4" }} />
+                        <CircularProgress classNames={{ svg: "w-4 h-4" }} aria-label="Updating chart" />
                         <Spacer x={1} />
                         <span className="text-[10px] text-default-500">{"Updating..."}</span>
                       </>
@@ -498,21 +544,37 @@ function Chart(props) {
                     {chart.autoUpdate > 0 && (
                       <Tooltip content={`Updates every ${_getUpdateFreqText(chart.autoUpdate)}`}>
                         <div>
-                          <LuCalendarClock size={14} />
+                          <LuCalendarClock size={12} />
                         </div>
                       </Tooltip>
                     )}
                     {chart.public && !isPublic && !print && (
                       <Tooltip content="This chart is public">
                         <div>
-                          <LuUnlock size={14} />
+                          <LuLockOpen size={12} />
                         </div>
                       </Tooltip>
                     )}
-                    {chart.onReport && !isPublic && !print && (
-                      <Tooltip content="This chart is on a report">
+                    {(chart.onReport && !isPublic && !print && !chart.draft) && (
+                      <Tooltip content="This chart is visible on your report">
                         <div>
-                          <LuTv2 size={14} />
+                          <LuMonitor size={12} />
+                        </div>
+                      </Tooltip>
+                    )}
+                    {(!chart.onReport || chart.draft) && (
+                      <Tooltip
+                        content={chart.draft ? "Draft charts are not visible on your report" : "This chart is not visible on your report"}
+                      >
+                        <div>
+                          <LuMonitorX size={12} />
+                        </div>
+                      </Tooltip>
+                    )}
+                    {chart?.Alerts?.length > 0 && (
+                      <Tooltip content="This chart has alerts">
+                        <div className="hover:text-primary cursor-pointer" onClick={_openAlertsModal}>
+                          <LuBell size={12} />
                         </div>
                       </Tooltip>
                     )}
@@ -522,91 +584,158 @@ function Chart(props) {
             </div>
             <div className="col-span-6 sm:col-span-4 flex items-start justify-end">
               {_checkIfFilters() && (
-                <Popover>
-                  <PopoverTrigger>
-                    <LinkNext className="text-gray-500">
-                      <LuListFilter />
-                    </LinkNext>
-                  </PopoverTrigger>
-                  <PopoverContent>
+                <div className="flex items-start gap-1">
+                  {chartSize?.[2] > 3 && (
                     <ChartFilters
                       chart={chart}
                       onAddFilter={_onAddFilter}
                       onClearFilter={_onClearFilter}
                       conditions={conditions}
+                      inline
+                      size="sm"
+                      amount={1}
                     />
-                  </PopoverContent>
-                </Popover>
+                  )}
+                  <Popover>
+                    <PopoverTrigger>
+                      <LinkNext className="text-gray-500">
+                        <Badge
+                          color="primary"
+                          content={conditions.length}
+                          size="sm"
+                          isInvisible={!conditions || conditions.length === 0}
+                        >
+                          <LuListFilter />
+                        </Badge>
+                      </LinkNext>
+                    </PopoverTrigger>
+                    <PopoverContent className="pt-3">
+                      <ChartFilters
+                        chart={chart}
+                        onAddFilter={_onAddFilter}
+                        onClearFilter={_onClearFilter}
+                        conditions={conditions}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               )}
               {projectId && !print && (
-                <Dropdown>
+                <Dropdown aria-label="Select a chart option">
                   <DropdownTrigger>
                     <LinkNext className="text-gray-500 cursor-pointer chart-settings-tutorial">
-                      <LuMoreVertical />
+                      <LuEllipsisVertical />
                     </LinkNext>
                   </DropdownTrigger>
                   <DropdownMenu>
                     <DropdownItem
-                      startContent={(chartLoading || chart.loading) ? <CircularProgress classNames={{ svg: "w-5 h-5" }} size="sm" /> : <LuRefreshCw />}
-                      onClick={_onGetChartData}
+                      startContent={(chartLoading || chart.loading) ? <CircularProgress classNames={{ svg: "w-5 h-5" }} size="sm" aria-label="Refreshing chart" /> : <LuRefreshCw />}
+                      onPress={_onGetChartData}
+                      textValue="Refresh chart"
                     >
                       Refresh chart
                     </DropdownItem>
-                    {_canAccess("projectAdmin") && (
+                    {_canAccess("projectEditor") && (
                       <DropdownItem
                         startContent={<LuSettings />}
-                        onClick={() => navigate(`/${params.teamId}/${params.projectId}/chart/${chart.id}/edit`)}
+                        onPress={() => navigate(`/${params.teamId}/${params.projectId}/chart/${chart.id}/edit`)}
+                        textValue="Edit chart"
                       >
                         Edit chart
                       </DropdownItem>
                     )}
-                    {_canAccess("projectAdmin") && (
+                    {_canAccess("projectEditor") && chart.draft && (
+                      <DropdownItem
+                        startContent={<LuCircleCheck />}
+                        onPress={_onPublishChart}
+                        textValue="Publish chart"
+                      >
+                        Publish chart
+                      </DropdownItem>
+                    )}
+                    {_canAccess("projectEditor") && (
                       <DropdownItem
                         startContent={<LuLayoutDashboard className={editingLayout ? "text-primary" : ""} />}
-                        onClick={onEditLayout}
+                        onPress={onEditLayout}
                         showDivider
+                        textValue={editingLayout ? "Complete layout" : "Edit layout"}
+                        endContent={<Kbd keys={[isMac ? "command" : "ctrl", "e"]}>E</Kbd>}
                       >
                         <span className={editingLayout ? "text-primary" : ""}>
                           {editingLayout ? "Complete layout" : "Edit layout"}
                         </span>
                       </DropdownItem>
                     )}
-                    {_canAccess("projectAdmin") && (
-                      <DropdownItem startContent={<LuCalendarClock />} onClick={_openUpdateModal}>
+                    {_canAccess("projectEditor") && (
+                      <DropdownItem
+                        startContent={<LuCalendarClock />}
+                        onPress={_openUpdateModal}
+                        textValue="Auto-update"
+                      >
                         Auto-update
                       </DropdownItem>
                     )}
+                    {_canAccess("projectEditor") && (
+                      <DropdownItem
+                        startContent={<LuBell />}
+                        onPress={_openAlertsModal}
+                        textValue="Alerts"
+                      >
+                        Alerts
+                      </DropdownItem>
+                    )}
                     <DropdownItem
-                      startContent={exportLoading ? <CircularProgress size="sm" /> : <LuFileDown />}
-                      onClick={_onExport}
+                      startContent={exportLoading ? <CircularProgress size="sm" aria-label="Exporting chart" /> : <LuFileDown />}
+                      onPress={_onExport}
+                      textValue="Export to Excel"
                     >
                       Export to Excel
                     </DropdownItem>
-                    {!chart.draft && _canAccess("projectAdmin") && (
-                      <DropdownItem startContent={<LuTv2 />} onClick={_onChangeReport}>
+                    {!chart.draft && _canAccess("projectEditor") && (
+                      <DropdownItem
+                        startContent={chart.onReport ? <LuMonitorX /> : <LuMonitor />}
+                        onPress={_onChangeReport}
+                        textValue={chart.onReport ? "Remove from report" : "Add to report"}
+                        showDivider
+                      >
                         {chart.onReport ? "Remove from report" : "Add to report"}
                       </DropdownItem>
                     )}
-                    {!chart.draft && chart.public && _canAccess("projectAdmin") && (
+                    {!chart.draft && chart.public && _canAccess("projectEditor") && (
                       <DropdownItem
-                        startContent={chart.public ? <LuUnlock /> : <LuLock />}
-                        onClick={_onPublicConfirmation}
+                        startContent={chart.public ? <LuLockOpen /> : <LuLock />}
+                        onPress={_onPublicConfirmation}
+                        textValue={chart.public ? "Make private" : "Make public"}
                       >
                         {"Make private"}
                       </DropdownItem>
                     )}
-                    {!chart.draft && (
-                      <DropdownItem startContent={<LuShare />} onClick={_onEmbed} showDivider>
+                    {!chart.draft && _canAccess("projectEditor") && (
+                      <DropdownItem
+                        startContent={<LuShare />}
+                        onPress={_onEmbed}
+                        textValue="Embed & Share"
+                      >
                         {"Embed & Share"}
                       </DropdownItem>
                     )}
                     {!chart.draft && chart.shareable && (
-                      <DropdownItem startContent={<LuLink />} onClick={_onOpenEmbed}>
+                      <DropdownItem
+                        startContent={<LuLink />}
+                        onPress={_onOpenEmbed}
+                        textValue="Open in a new tab"
+                        showDivider
+                      >
                         {"Open in a new tab"}
                       </DropdownItem>
                     )}
-                    {_canAccess("projectAdmin") && (
-                      <DropdownItem startContent={<LuTrash />} color="danger" onClick={_onDeleteChartConfirmation}>
+                    {_canAccess("projectEditor") && (
+                      <DropdownItem
+                        startContent={<LuTrash />}
+                        color="danger"
+                        onPress={_onDeleteChartConfirmation}
+                        textValue="Delete chart"
+                      >
                         Delete chart
                       </DropdownItem>
                     )}
@@ -615,15 +744,15 @@ function Chart(props) {
               )}
 
               {showExport && (
-                <Dropdown>
+                <Dropdown aria-label="Select an export option">
                   <DropdownTrigger>
                     <LinkNext color="foreground">
-                      <LuMoreHorizontal size={24} />
+                      <LuEllipsis size={24} />
                     </LinkNext>
                   </DropdownTrigger>
                   <DropdownMenu>
                     <DropdownItem
-                      startContent={exportLoading ? <CircularProgress size="sm" /> : <LuFileDown />}
+                      startContent={exportLoading ? <CircularProgress size="sm" aria-label="Exporting chart" /> : <LuFileDown />}
                       onClick={() => _onPublicExport(chart)}
                       textValue="Export to Excel"
                     >
@@ -768,7 +897,7 @@ function Chart(props) {
             <Button
               isLoading={publicLoading}
               color="primary"
-              endContent={<LuUnlock />}
+              endContent={<LuLockOpen />}
               onClick={_onPublic}
             >
               Make the chart public
@@ -794,41 +923,42 @@ function Chart(props) {
                     setUpdateFrequency(parseInt(key[0].value));
                   }}
                   variant="bordered"
+                  aria-label="Select a preset"
                 >
-                    <SelectItem key="0" onClick={() => setUpdateFrequency(0)}>
+                    <SelectItem key="0" onClick={() => setUpdateFrequency(0)} textValue="Don't auto update">
                       {"Don't auto update"}
                     </SelectItem>
-                    <SelectItem key="60" onClick={() => setUpdateFrequency(60)}>
+                    <SelectItem key="60" onClick={() => setUpdateFrequency(60)} textValue="Every minute">
                       Every minute
                     </SelectItem>
-                    <SelectItem key="300" onClick={() => setUpdateFrequency(300)}>
+                      <SelectItem key="300" onClick={() => setUpdateFrequency(300)} textValue="Every 5 minutes">
                       Every 5 minutes
                     </SelectItem>
-                    <SelectItem key="900" onClick={() => setUpdateFrequency(900)}>
+                    <SelectItem key="900" onClick={() => setUpdateFrequency(900)} textValue="Every 15 minutes">
                       Every 15 minutes
                     </SelectItem>
-                    <SelectItem key="1800" onClick={() => setUpdateFrequency(1800)}>
+                    <SelectItem key="1800" onClick={() => setUpdateFrequency(1800)} textValue="Every 30 minutes">
                       Every 30 minutes
                     </SelectItem>
-                    <SelectItem key="3600" onClick={() => setUpdateFrequency(3600)}>
+                    <SelectItem key="3600" onClick={() => setUpdateFrequency(3600)} textValue="Every hour">
                       Every hour
                     </SelectItem>
-                    <SelectItem key="10800" onClick={() => setUpdateFrequency(10800)}>
+                    <SelectItem key="10800" onClick={() => setUpdateFrequency(10800)} textValue="Every 3 hours">
                       Every 3 hours
                     </SelectItem>
-                    <SelectItem key="21600" onClick={() => setUpdateFrequency(21600)}>
+                    <SelectItem key="21600" onClick={() => setUpdateFrequency(21600)} textValue="Every 6 hours">
                       Every 6 hours
                     </SelectItem>
-                    <SelectItem key="43200" onClick={() => setUpdateFrequency(43200)}>
+                    <SelectItem key="43200" onClick={() => setUpdateFrequency(43200)} textValue="Every 12 hours">
                       Every 12 hours
                     </SelectItem>
-                    <SelectItem key="86400" onClick={() => setUpdateFrequency(86400)}>
+                    <SelectItem key="86400" onClick={() => setUpdateFrequency(86400)} textValue="Every day">
                       Every day
                     </SelectItem>
-                    <SelectItem key="604800" onClick={() => setUpdateFrequency(604800)}>
+                    <SelectItem key="604800" onClick={() => setUpdateFrequency(604800)} textValue="Every week">
                       Every week
                     </SelectItem>
-                    <SelectItem key="2592000" onClick={() => setUpdateFrequency(2592000)}>
+                    <SelectItem key="2592000" onClick={() => setUpdateFrequency(2592000)} textValue="Every month">
                       Every month
                     </SelectItem>
                 </Select>
@@ -848,7 +978,7 @@ function Chart(props) {
                   disableAnimation
                   min={updateFreqType === "seconds" ? 10 : 1}
                 />
-                <Dropdown>
+                <Dropdown aria-label="Select a time unit">
                   <DropdownTrigger>
                     <Button
                       variant="bordered"
@@ -863,16 +993,16 @@ function Chart(props) {
                     </Button>
                   </DropdownTrigger>
                   <DropdownMenu>
-                    <DropdownItem key="seconds" onClick={() => setUpdateFreqType("seconds")}>
+                    <DropdownItem key="seconds" onClick={() => setUpdateFreqType("seconds")} textValue="Seconds">
                       <Text>Seconds</Text>
                     </DropdownItem>
-                    <DropdownItem key="minutes" onClick={() => setUpdateFreqType("minutes")}>
+                    <DropdownItem key="minutes" onClick={() => setUpdateFreqType("minutes")} textValue="Minutes">
                       <Text>Minutes</Text>
                     </DropdownItem>
-                    <DropdownItem key="hours" onClick={() => setUpdateFreqType("hours")}>
+                    <DropdownItem key="hours" onClick={() => setUpdateFreqType("hours")} textValue="Hours">
                       <Text>Hours</Text>
                     </DropdownItem>
-                    <DropdownItem key="days" onClick={() => setUpdateFreqType("days")}>
+                    <DropdownItem key="days" onClick={() => setUpdateFreqType("days")} textValue="Days">
                       <Text>Days</Text>
                     </DropdownItem>
                   </DropdownMenu>
@@ -936,14 +1066,15 @@ function Chart(props) {
                   label={chart.shareable ? "Disable sharing" : "Enable sharing"}
                   onChange={_onToggleShareable}
                   isSelected={chart.shareable}
-                  disabled={!_canAccess("projectAdmin")}
+                  disabled={!_canAccess("projectEditor")}
+                  size="sm"
                 />
                 <Spacer x={0.5} />
                 <Text>
                   {chart.shareable ? "Disable sharing" : "Enable sharing"}
                 </Text>
                 <Spacer x={0.5} />
-                {shareLoading && (<CircularProgress size="sm" />)}
+                {shareLoading && (<CircularProgress size="sm" aria-label="Sharing chart" />)}
               </Row>
               <Spacer y={2} />
               {chart.public && !chart.shareable && (
@@ -963,7 +1094,7 @@ function Chart(props) {
                   </Row>
                 </>
               )}
-              {!_canAccess("projectAdmin") && !chart.public && !chart.shareable && (
+              {!_canAccess("projectEditor") && !chart.public && !chart.shareable && (
                 <>
                   <Spacer y={2} />
                   <Row>
@@ -990,7 +1121,7 @@ function Chart(props) {
                 </>
               )}
               {shareLoading && (
-                <Row><CircularProgress /></Row>
+                <Row><CircularProgress aria-label="Creating sharing code" /></Row>
               )}
 
               {(chart.shareable || chart.public)
@@ -998,6 +1129,24 @@ function Chart(props) {
               && (chart.Chartshares && chart.Chartshares.length > 0)
               && (
                 <>
+                  <div className="flex items-center">
+                    <RadioGroup
+                      label="Select a theme"
+                      orientation="horizontal"
+                      size="sm"
+                    >
+                      <Radio value="os" onClick={() => setEmbedTheme("")} checked={embedTheme === ""}>
+                        System default
+                      </Radio>
+                      <Radio value="dark" onClick={() => setEmbedTheme("dark")} checked={embedTheme === "dark"}>
+                        Dark
+                      </Radio>
+                      <Radio value="light" onClick={() => setEmbedTheme("light")} checked={embedTheme === "light"}>
+                        Light
+                      </Radio>
+                    </RadioGroup>
+                  </div>
+                  <Spacer y={1} />
                   <Row>
                     <Textarea
                       label={"Copy the following code on the website you wish to add your chart in."}
@@ -1060,6 +1209,60 @@ function Chart(props) {
           </ModalContent>
         </Modal>
       )}
+
+
+      {/* ALERTS MODAL */}
+      <Modal isOpen={alertsModal} onClose={() => setAlertsModal(false)}>
+        <ModalContent>
+          <ModalHeader>
+            <div className="font-bold">{"Alerts"}</div>
+          </ModalHeader>
+          <ModalBody>
+            <div className="text-sm">{"Select a dataset to set up alerts for"}</div>
+            <Select
+              selectionMode="single"
+              selectedKeys={[`${alertsDatasetId}`]}
+              onSelectionChange={(keys) => {
+                setAlertsDatasetId(keys.currentKey);
+              }}
+              variant="bordered"
+              aria-label="Select a dataset"
+            >
+              {chart?.ChartDatasetConfigs?.map((config) => (
+                <SelectItem key={config.id} value={config.id} textValue={config.legend}>
+                  {config.legend}
+                </SelectItem>
+              ))}
+            </Select>
+
+            {alertsDatasetId && (
+              <>
+                <Divider />
+                {chart?.Alerts?.length > 0 && (
+                  <div className="text-sm">{"Your current alerts:"}</div>
+                )}
+
+                <DatasetAlerts
+                  chartType={chart.type}
+                  chartId={chart.id}
+                  cdcId={alertsDatasetId}
+                  projectId={chart.project_id}
+                  onChanged={_onGetChart}
+                />
+              </>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="bordered"
+              onClick={() => setAlertsModal(false)}
+              auto
+            >
+              Close
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </motion.div>
   );
 }
@@ -1107,6 +1310,7 @@ Chart.propTypes = {
   password: PropTypes.string,
   editingLayout: PropTypes.bool,
   onEditLayout: PropTypes.func,
+  variables: PropTypes.object,
 };
 
 const mapStateToProps = (state) => {

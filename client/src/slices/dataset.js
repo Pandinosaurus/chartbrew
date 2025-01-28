@@ -22,6 +22,10 @@ export const getDatasets = createAsyncThunk(
     });
 
     const response = await fetch(url, { method, headers });
+    if (!response.ok) {
+      throw new Error("Failed to fetch datasets");
+    }
+
     const responseJson = await response.json();
 
     return responseJson;
@@ -40,6 +44,10 @@ export const getDataset = createAsyncThunk(
     });
 
     const response = await fetch(url, { method, headers });
+    if (!response.ok) {
+      throw new Error("Failed to fetch datasets");
+    }
+
     const responseJson = await response.json();
 
     return responseJson;
@@ -60,6 +68,10 @@ export const saveNewDataset = createAsyncThunk(
     });
 
     const response = await fetch(url, { method, body, headers });
+    if (!response.ok) {
+      throw new Error("Failed to fetch datasets");
+    }
+
     const responseJson = await response.json();
 
     return responseJson;
@@ -80,6 +92,10 @@ export const updateDataset = createAsyncThunk(
     });
 
     const response = await fetch(url, { method, body, headers });
+    if (!response.ok) {
+      throw new Error("Failed to fetch datasets");
+    }
+
     const responseJson = await response.json();
 
     return responseJson;
@@ -98,6 +114,10 @@ export const deleteDataset = createAsyncThunk(
     });
 
     const response = await fetch(url, { method, headers });
+    if (!response.ok) {
+      throw new Error("Failed to fetch datasets");
+    }
+
     const responseJson = await response.json();
 
     return responseJson;
@@ -539,12 +559,29 @@ export const datasetSlice = createSlice({
               ...dataset,
               DataRequests: dataset.DataRequests.map((dataRequest) => {
                 if (dataRequest.id === parseInt(action.meta.arg.dataRequest_id, 10)) {
-                  return {
+                  let newDr = {
                     ...dataRequest,
                     loading: false,
                     response: action.payload.response?.dataRequest?.responseData?.data,
                     error: false,
                   };
+
+                  if (action.payload?.response?.status?.statusCode >= 300) {
+                    newDr = {
+                      ...newDr,
+                      error: true,
+                      response: action.payload.response,
+                    };
+                  }
+
+                  if (action.payload?.response?.dataRequest?.dataRequest) {
+                    newDr = {
+                      ...newDr,
+                      ...action.payload.response.dataRequest.dataRequest,
+                    }; 
+                  }
+
+                  return newDr;
                 }
                 return dataRequest;
               }),
@@ -580,6 +617,7 @@ export const datasetSlice = createSlice({
 export const { clearDatasets } = datasetSlice.actions;
 
 export const selectDatasets = (state) => state.dataset.data;
+export const selectDatasetsNoDrafts = (state) => state.dataset.data.filter((dataset) => !dataset.draft);
 export const selectResponses = (state) => state.dataset.responses;
 export const selectDataRequests = (state, datasetId) => {
   const dataset = state.dataset.data.find((dataset) => dataset.id === parseInt(datasetId, 10));
@@ -587,6 +625,17 @@ export const selectDataRequests = (state, datasetId) => {
     return dataset.DataRequests;
   }
   return [];
+}
+
+export const selectDataRequest = (state, datasetId, drId) => {
+  const dataset = state.dataset.data.find((dataset) => dataset.id === parseInt(datasetId, 10));
+  if (dataset) {
+    const dr = dataset.DataRequests.find((dr) => dr.id === parseInt(drId, 10));
+    if (dr) {
+      return dr;
+    }
+  }
+  return {};
 }
 
 export default datasetSlice.reducer;

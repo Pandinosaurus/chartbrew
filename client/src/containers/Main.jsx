@@ -1,19 +1,20 @@
-import React, { useEffect, lazy, Suspense } from "react";
+import React, { useEffect, lazy, Suspense, useRef } from "react";
 import PropTypes from "prop-types";
 import { connect, useDispatch, useSelector } from "react-redux";
 import { Route, Routes, useLocation, useNavigate } from "react-router";
-import { semanticColors } from "@nextui-org/theme";
+import { semanticColors } from "@heroui/theme";
 import { Helmet } from "react-helmet";
 
 import SuspenseLoader from "../components/SuspenseLoader";
-import UserDashboard from "./UserDashboard";
+import UserDashboard from "./UserDashboard/UserDashboard";
 
 import {
   relog, areThereAnyUsers,
+  selectUser,
 } from "../slices/user";
-import { getTeams, selectTeam } from "../slices/team";
+import { getTeams, saveActiveTeam, selectTeam, selectTeams } from "../slices/team";
 import { cleanErrors as cleanErrorsAction } from "../actions/error";
-import useThemeDetector from "../modules/useThemeDetector";
+import { useTheme } from "../modules/ThemeContext";
 import { IconContext } from "react-icons";
 import TeamMembers from "./TeamMembers/TeamMembers";
 import TeamSettings from "./TeamSettings";
@@ -26,6 +27,11 @@ import Dataset from "./Dataset/Dataset";
 // import { getProjects } from "../slices/project";
 import ConnectionWizard from "./Connections/ConnectionWizard";
 import LoadingScreen from "../components/LoadingScreen";
+import Variables from "./Variables/Variables";
+import { Toaster } from "react-hot-toast";
+import ConnectionList from "./UserDashboard/ConnectionList";
+import DatasetList from "./UserDashboard/DatasetList";
+import DashboardList from "./UserDashboard/DashboardList";
 
 const ProjectBoard = lazy(() => import("./ProjectBoard/ProjectBoard"));
 const Signup = lazy(() => import("./Signup"));
@@ -67,13 +73,26 @@ function authenticatePage() {
 function Main(props) {
   const { cleanErrors } = props;
 
+  const user = useSelector(selectUser);
   const team = useSelector(selectTeam);
+  const teams = useSelector(selectTeams);
+  const teamsRef = useRef(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (isDark) {
+      document.body.classList.add("dark");
+      document.body.classList.remove("light");
+    } else {
+      document.body.classList.add("light");
+      document.body.classList.remove("dark");
+    }
+  }, [isDark]);
 
   useEffect(() => {
     cleanErrors();
@@ -102,6 +121,16 @@ function Main(props) {
         });
     }
   }, []);
+
+  useEffect(() => {
+    if (teams && teams.length > 0 && !teamsRef.current) {
+      teamsRef.current = true;
+      let selectedTeam = teams.find((t) => t.TeamRoles.find((tr) => tr.role === "teamOwner" && tr.user_id === user.id));
+
+      if (!selectedTeam) return;
+      dispatch(saveActiveTeam(selectedTeam));
+    }
+  }, [teams]);
 
   return (
     <IconContext.Provider value={{ className: "react-icons", size: 20, style: { opacity: 0.8 } }}>
@@ -144,7 +173,12 @@ function Main(props) {
         <div>
           <Suspense fallback={<SuspenseLoader />}>
             <Routes>
-              <Route exact path="/" element={<UserDashboard />} />
+              <Route path="/" element={<UserDashboard />}>
+                <Route index element={<DashboardList />} />
+                <Route path="connections" element={<ConnectionList />} />
+                <Route path="datasets" element={<DatasetList />} />
+                <Route path="integrations" element={<Integrations />} />
+              </Route>
               <Route exact path="/b/:brewName" element={<PublicDashboard />} />
               <Route
                 exact
@@ -218,6 +252,11 @@ function Main(props) {
                   path="integrations"
                   element={<Integrations />}
                 />
+                <Route
+                  exact
+                  path="variables"
+                  element={<Variables />}
+                />
               </Route>
 
               <Route
@@ -241,6 +280,18 @@ function Main(props) {
           </Suspense>
         </div>
       </div>
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 2500,
+          style: {
+            borderRadius: "8px",
+            background: isDark ? "#333" : "#fff",
+            color: isDark ? "#fff" : "#000",
+          },
+        }}
+      />
     </IconContext.Provider>
   );
 }

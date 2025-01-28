@@ -3,8 +3,8 @@ import PropTypes from "prop-types";
 
 import {
   Button, Divider, Input, Spacer,Chip, Tabs, Tab, Select, SelectItem,
-} from "@nextui-org/react";
-import uuid from "uuid/v4";
+} from "@heroui/react";
+import { v4 as uuid } from "uuid";
 import AceEditor from "react-ace";
 import { useParams } from "react-router";
 import { HiPlus, HiX } from "react-icons/hi";
@@ -16,8 +16,9 @@ import "ace-builds/src-min-noconflict/theme-one_dark";
 
 import Row from "../../../components/Row";
 import Text from "../../../components/Text";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { testRequest } from "../../../slices/connection";
+import { LuEye, LuEyeOff } from "react-icons/lu";
 
 
 const authTypes = [{
@@ -50,8 +51,9 @@ function ApiConnectionForm(props) {
   const [errors, setErrors] = useState({});
   const [menuType, setMenuType] = useState("authentication");
   const [testResult, setTestResult] = useState(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const initRef = useRef(null);
   const dispatch = useDispatch();
   const params = useParams();
@@ -195,7 +197,7 @@ function ApiConnectionForm(props) {
   };
 
   return (
-    <div className="p-unit-lg bg-content1 border-1 border-solid border-content3 rounded-lg">
+    <div className="p-4 bg-content1 border-1 border-solid border-content3 rounded-lg">
       <div>
         <Row align="center">
           <p className="font-semibold">
@@ -255,7 +257,7 @@ function ApiConnectionForm(props) {
                   variant="bordered"
                 >
                   {authTypes.map((type) => (
-                    <SelectItem key={type.value}>
+                    <SelectItem key={type.value} textValue={type.text}>
                       {type.text}
                     </SelectItem>
                   ))}
@@ -277,13 +279,20 @@ function ApiConnectionForm(props) {
                 <Spacer y={2} />
                 <Row align="center">
                   <Input
-                    type="password"
+                    type={passwordVisible ? "text" : "password"}
                     label="Enter a Password or API Key Value"
                     placeholder="Password or API Key Value"
                     onChange={(e) => _onChangeAuthParams("pass", e.target.value)}
                     value={connection.authentication.pass}
                     fullWidth
                     variant="bordered"
+                    endContent={(
+                      <button
+                        onClick={() => setPasswordVisible(!passwordVisible)}
+                      >
+                        {passwordVisible ? <LuEyeOff /> : <LuEye />}
+                      </button>
+                    )}
                   />
                 </Row>
               </div>
@@ -291,13 +300,20 @@ function ApiConnectionForm(props) {
             {connection.authentication && connection.authentication.type === "bearer_token" && (
               <div className="col-span-12 sm:col-span-12 md:col-span-5 lg:col-span-5 xl:col-span-5">
                 <Input
-                  type="password"
+                  type={passwordVisible ? "text" : "password"}
                   label="Enter the token"
                   placeholder="Authentication token"
                   onChange={(e) => _onChangeAuthParams("token", e.target.value)}
                   value={connection.authentication.token}
                   fullWidth
                   variant="bordered"
+                  endContent={(
+                    <button
+                      onClick={() => setPasswordVisible(!passwordVisible)}
+                    >
+                      {passwordVisible ? <LuEyeOff /> : <LuEye />}
+                    </button>
+                  )}
                 />
               </div>
             )}

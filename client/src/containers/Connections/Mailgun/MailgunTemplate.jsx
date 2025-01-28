@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Button, Checkbox, Divider, Input, Link, Select, SelectItem, Spacer,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import _ from "lodash";
 import cookie from "react-cookies";
 import { LuArrowLeft, LuArrowRight, LuArrowUp, LuCheckCheck, LuExternalLink, LuPlus, LuX } from "react-icons/lu";
@@ -239,9 +239,10 @@ function MailgunTemplate(props) {
               variant="bordered"
               selectionMode="single"
               selectedKeys={[selectedConnection]}
+              aria-label="Select a connection"
             >
               {availableConnections.map((connection) => (
-                <SelectItem key={connection.key}>
+                <SelectItem key={connection.key} textValue={connection.text}>
                   {connection.text}
                 </SelectItem>
               ))}
@@ -305,9 +306,10 @@ function MailgunTemplate(props) {
               onSelectionChange={(keys) => setConnection({ ...connection, domainLocation: keys.currentKey })}
               selectionMode="single"
               className="max-w-[400px]"
+              aria-label="Select a domain location"
             >
               {countryOptions.map((location) => (
-                <SelectItem key={location.key}>
+                <SelectItem key={location.key} textValue={location.text}>
                   {location.text}
                 </SelectItem>
               ))}

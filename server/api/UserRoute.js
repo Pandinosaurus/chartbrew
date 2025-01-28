@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
 const request = require("request");
-const uuid = require("uuid/v4");
 const rateLimit = require("express-rate-limit");
 
 const UserController = require("../controllers/UserController");
@@ -25,7 +24,7 @@ module.exports = (app) => {
       id: user.id,
       email: user.email,
     };
-    jwt.sign(userToken, app.settings.secret, {
+    jwt.sign(userToken, app.settings.encryptionKey, {
       expiresIn: 2592000 // a month
     }, (err, token) => {
       if (err) return res.status(400).send(err);
@@ -102,49 +101,6 @@ module.exports = (app) => {
         if (error.message === "409") return res.status(409).send("The email is already used");
         return res.status(400).send(error);
       });
-  });
-
-  // --------------------------------------
-  /*
-  ** Route for authenticating a oneaccount user
-  */
-  app.post("/oneaccountauth", async (req, res) => {
-    if (!req.oneaccount) {
-      return res.status(401).send("Unauthorized");
-    }
-    const icon = req.oneaccount.firstName.substring(0, 1) + req.oneaccount.lastName.substring(0, 1);
-    const userObj = {
-      oneaccountId: req.oneaccount.userId,
-      name: `${req.oneaccount.firstName} ${req.oneaccount.lastName}`,
-      email: req.oneaccount.email,
-      // generate random password so no one can login using email/pass combination
-      password: uuid(),
-      active: false,
-      icon: icon.toUpperCase(),
-    };
-    // one account provides the same flow for sign up and sign in
-    // so we can handle both here:
-    // log in if exists
-    try {
-      const user = await userController.findByEmail(userObj.email);
-      if (user && user.id) {
-        const updatedUser = await userController.update(user.id, { lastLogin: new Date() });
-        return tokenizeUser(updatedUser, res);
-      }
-    } catch (error) {
-      // the user is not registered yet, continue to register
-    }
-    // otherwise register
-    try {
-      if (!userObj || !userObj.email) {
-        return new Promise((resolve, reject) => reject(new Error("no email is provided")));
-      }
-      const user = await userController.createUser(userObj);
-      return tokenizeUser(user, res);
-    } catch (error) {
-      if (error.message === "409") return res.status(409).send("The email is already used");
-      return res.status(400).send(error);
-    }
   });
   // --------------------------------------
 
@@ -230,15 +186,24 @@ module.exports = (app) => {
     let user = {};
     return userController.login(req.body.email, req.body.password)
       .then((data) => {
+        if (data?.method_id) {
+          return data;
+        }
+
         user = data;
         return userController.update(user.id, { lastLogin: new Date() });
       })
-      .then(() => {
+      .then((data) => {
+        if (data?.method_id) {
+          return res.status(200).json(data);
+        }
         return tokenizeUser(user, res);
       })
       .catch((error) => {
-        if (error.message === "401") return res.status(401).send("The credentials are incorrect");
-        if (error.message === "404") return res.status(404).send("The email is not registreded");
+        if (error.message === "401") {
+          return res.status(401).json({ message: "The credentials are incorrect" });
+        }
+
         return res.status(400).send(error);
       });
   });
@@ -251,6 +216,9 @@ module.exports = (app) => {
     return userController.update(req.user.id, { lastLogin: new Date() })
       .then(() => {
         return res.status(200).send(req.user);
+      })
+      .catch((error) => {
+        return res.status(400).send(error);
       });
   });
   // --------------------------------------
@@ -393,6 +361,83 @@ module.exports = (app) => {
       });
   });
   // --------------------------------------
+
+  /*
+  ** Route to set up 2FA app for a user
+  */
+  app.post("/user/:id/2fa/app", apiLimiter(5), verifyToken, (req, res) => {
+    return userController.setup2faApp(req.user.id)
+      .then((qrUrl) => {
+        return res.status(200).send({ qrUrl });
+      })
+      .catch((error) => {
+        return res.status(400).send(error);
+      });
+  });
+  // --------------------------------------
+
+  /*
+  ** Route to verify the 2FA app for a user
+  */
+  app.post("/user/:id/2fa/app/verify", apiLimiter(5), verifyToken, (req, res) => {
+    return userController.verify2faApp(req.user.id, req.body)
+      .then((backupCodes) => {
+        return res.status(200).send({ backupCodes });
+      })
+      .catch((error) => {
+        return res.status(400).send(error);
+      });
+  });
+  // --------------------------------------
+
+  /*
+  ** Route to validate 2fa login method
+  */
+  app.post("/user/:id/2fa/:method_id/login", apiLimiter(5), (req, res) => {
+    let user;
+    return userController.validate2FaLogin(req.params.id, req.body.method_id, req.body.token)
+      .then((data) => {
+        user = data;
+        return userController.update(user.id, { lastLogin: new Date() });
+      })
+      .then(() => {
+        return tokenizeUser(user, res);
+      })
+      .catch((error) => {
+        if (error.message === "401") return res.status(401).send("The credentials are incorrect");
+        if (error.message === "404") return res.status(404).send("The email is not registreded");
+        return res.status(400).send(error);
+      });
+  });
+  // --------------------------------------
+
+  /*
+  ** Route to get all 2fa methods for a user
+  */
+  app.get("/user/:id/2fa", verifyToken, (req, res) => {
+    return userController.get2faMethods(req.user.id)
+      .then((methods) => {
+        return res.status(200).send(methods);
+      })
+      .catch((error) => {
+        return res.status(400).send(error);
+      });
+  });
+  // --------------------------------------
+
+  /*
+  ** Route to remove a 2fa method
+  */
+  app.delete("/user/:id/2fa/:method_id", verifyToken, (req, res) => {
+    return userController.remove2faMethod(req.user.id, req.params.method_id, req.body.password)
+      .then((result) => {
+        return res.status(200).send({ removed: result });
+      })
+      .catch((err) => {
+        return res.status(400).send(err);
+      });
+  });
+  // -------------------------------------
 
   return (req, res, next) => {
     next();

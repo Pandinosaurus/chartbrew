@@ -117,7 +117,14 @@ export const login = createAsyncThunk(
 
     const response = await fetch(url, { body, headers, method });
     if (!response.ok) {
-      throw new Error("Error logging in");
+      let errorMessage = "Invalid credentials";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error;
+      } catch (e) {
+        errorMessage = response.statusText;
+      }
+      throw new Error(errorMessage);
     }
 
     const userData = await response.json();
@@ -262,16 +269,16 @@ export const requestEmailUpdate = createAsyncThunk(
 
 export const updateEmail = createAsyncThunk(
   "user/updateEmail",
-  async ({ user_id, updateToken }) => {
+  async ({ user_id, token }) => {
     const url = `${API_HOST}/user/${user_id}/email/update`;
-    const body = JSON.stringify({ token: updateToken });
+    const body = JSON.stringify({ token });
     const headers = new Headers({
       "Accept": "application/json",
       "Content-Type": "application/json",
       "Authorization": `Bearer ${getAuthToken()}`,
     });
 
-    const response = await fetch(url, { body, headers, method: "POST" });
+    const response = await fetch(url, { body, headers, method: "PUT" });
     if (!response.ok) {
       throw new Error("Error updating email");
     }
@@ -305,10 +312,122 @@ export const completeTutorial = createAsyncThunk(
   }
 );
 
+export const get2faAppCode = createAsyncThunk(
+  "user/get2faCode",
+  async (user_id) => {
+    const url = `${API_HOST}/user/${user_id}/2fa/app`;
+    const method = "POST";
+    const headers = new Headers({
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${getAuthToken()}`,
+    });
+
+    const response = await fetch(url, { headers, method });
+    if (!response.ok) {
+      throw new Error("Error getting 2fa code");
+    }
+
+    const data = await response.json();
+    return data;
+  }
+);
+
+export const verify2faApp = createAsyncThunk(
+  "user/verify2faApp",
+  async ({ user_id, token, password }) => {
+    const url = `${API_HOST}/user/${user_id}/2fa/app/verify`;
+    const body = JSON.stringify({ token, password });
+    const method = "POST";
+    const headers = new Headers({
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${getAuthToken()}`,
+    });
+
+    const response = await fetch(url, { headers, method, body });
+    if (!response.ok) {
+      throw new Error("Error verifying 2fa app");
+    }
+
+    const data = await response.json();
+    return data;
+  }
+);
+
+export const get2faMethods = createAsyncThunk(
+  "user/get2faMethods",
+  async (user_id) => {
+    const url = `${API_HOST}/user/${user_id}/2fa`;
+    const headers = new Headers({
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${getAuthToken()}`,
+    });
+
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new Error("Error getting 2fa methods");
+    }
+
+    const data = await response.json();
+    return data;
+  }
+);
+
+export const remove2faMethod = createAsyncThunk(
+  "user/remove2faMethod",
+  async ({ user_id, method_id, password }) => {
+    const url = `${API_HOST}/user/${user_id}/2fa/${method_id}`;
+    const headers = new Headers({
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${getAuthToken()}`,
+    });
+    const body = JSON.stringify({ password });
+    const method = "DELETE";
+
+    const response = await fetch(url, { method, headers, body });
+    if (!response.ok) {
+      throw new Error("Could not delete 2fa method");
+    }
+
+    const data = await response.json();
+    return data;
+  }
+);
+
+export const validate2faLogin = createAsyncThunk(
+  "user/validate2faLogin",
+  async({ user_id, method_id, token }) => {
+    const url = `${API_HOST}/user/${user_id}/2fa/${method_id}/login`;
+    const body = JSON.stringify({ token, method_id });
+    const method = "POST";
+    const headers = new Headers({
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    });
+
+    const response = await fetch(url, { headers, method, body });
+    if (!response.ok) {
+      throw new Error("Error verifying 2fa app");
+    }
+
+    const userData = await response.json();
+    if (getAuthToken()) {
+      cookie.remove(tokenKey, { path: "/" });
+    }
+    cookie.save(tokenKey, userData.token, { expires, path: "/" });
+
+    return userData;
+  }
+)
+
 const initialState = {
   loading: false,
   error: false,
   data: {},
+  auths: [],
 };
 
 export const userSlice = createSlice({
@@ -319,7 +438,10 @@ export const userSlice = createSlice({
       cookie.remove(tokenKey, { path: "/" });
       state.data = {};
       window.location.href = "/";
-    }
+    },
+    clearUser: (state) => {
+      state.data = {};
+    },
   },
   extraReducers: (builder) => {
     // createUser
@@ -380,7 +502,9 @@ export const userSlice = createSlice({
     });
     builder.addCase(login.fulfilled, (state, action) => {
       state.loading = false;
-      state.data = action.payload;
+      if (!action.payload?.method_id) {
+        state.data = action.payload;
+      }
     });
     builder.addCase(login.rejected, (state) => {
       state.loading = false;
@@ -412,10 +536,50 @@ export const userSlice = createSlice({
       state.loading = false;
       state.error = true;
     })
+
+    // get2faMethods
+    builder.addCase(get2faMethods.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(get2faMethods.fulfilled, (state, action) => {
+      state.loading = false;
+      state.auths = action.payload;
+    });
+    builder.addCase(get2faMethods.rejected, (state) => {
+      state.loading = false;
+      state.error = true;
+    })
+
+    // remove2faMethod
+    builder.addCase(remove2faMethod.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(remove2faMethod.fulfilled, (state, action) => {
+      state.loading = false;
+      state.auths = state.auths.filter((a) => a.id !== action.meta.arg.method_id);
+    });
+    builder.addCase(remove2faMethod.rejected, (state) => {
+      state.loading = false;
+      state.error = true;
+    });
+
+    // validate2faLogin
+    // login
+    builder.addCase(validate2faLogin.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(validate2faLogin.fulfilled, (state, action) => {
+      state.loading = false;
+      state.data = action.payload;
+    });
+    builder.addCase(validate2faLogin.rejected, (state) => {
+      state.loading = false;
+      state.error = true;
+    })
   },
 });
 
-export const { logout } = userSlice.actions;
+export const { logout, clearUser } = userSlice.actions;
 
 export const selectUser = (state) => state.user.data;
 

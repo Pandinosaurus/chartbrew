@@ -1,16 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { LuAreaChart, LuArrowLeftCircle, LuClipboard, LuClipboardCheck, LuCompass, LuLayoutDashboard, LuPartyPopper, LuSearch } from "react-icons/lu";
-import { Button, Card, CardBody, CardFooter, CardHeader, Image, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spacer } from "@nextui-org/react";
+import { LuBrainCircuit, LuChartArea, LuCircleArrowLeft, LuClipboard, LuClipboardCheck, LuCompass, LuLayoutDashboard, LuPartyPopper, LuSearch } from "react-icons/lu";
+import { Button, Card, CardBody, CardFooter, CardHeader, Chip, Image, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spacer, Tooltip } from "@heroui/react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router";
-import { ToastContainer, toast, Flip } from "react-toastify";
-import "react-toastify/dist/ReactToastify.min.css";
-
+import toast from "react-hot-toast";
+import { Link, useSearchParams } from "react-router-dom";
 
 import Segment from "../../components/Segment";
 import availableConnections from "../../modules/availableConnections";
 import connectionImages from "../../config/connectionImages";
-import useThemeDetector from "../../modules/useThemeDetector";
+import { useTheme } from "../../modules/ThemeContext";
 import Navbar from "../../components/Navbar";
 import ApiConnectionForm from "./components/ApiConnectionForm";
 import MongoConnectionForm from "./components/MongoConnectionForm";
@@ -21,9 +20,8 @@ import RealtimeDbConnectionForm from "./RealtimeDb/RealtimeDbConnectionForm";
 import GaConnectionForm from "./GoogleAnalytics/GaConnectionForm";
 import StrapiConnectionForm from "./Strapi/StrapiConnectionForm";
 import CustomerioConnectionForm from "./Customerio/CustomerioConnectionForm";
-import { addConnection, addFilesToConnection, getConnection, saveConnection } from "../../slices/connection";
+import { addConnection, addFilesToConnection, getConnection, getTeamConnections, saveConnection, selectConnections } from "../../slices/connection";
 import HelpBanner from "../../components/HelpBanner";
-import { Link, useSearchParams } from "react-router-dom";
 import { generateInviteUrl } from "../../slices/team";
 
 function ConnectionWizard() {
@@ -33,8 +31,9 @@ function ConnectionWizard() {
   const [newConnection, setNewConnection] = useState(null);
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [connectionToEdit, setConnectionToEdit] = useState(null);
 
-  const isDark = useThemeDetector();
+  const { isDark } = useTheme();
   const bottomRef = useRef(null);
   const asideRef = useRef(null);
   const paramsInitRef = useRef(null);
@@ -44,9 +43,10 @@ function ConnectionWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const connectionToEdit = useSelector((state) => state.connection.data.find((c) => c.id === parseInt(params.connectionId, 10)));
+  const connections = useSelector(selectConnections)
 
   useEffect(() => {
+    dispatch(getTeamConnections({ team_id: params.teamId }));
     dispatch(generateInviteUrl({
       team_id: params.teamId,
       projects: [],
@@ -79,7 +79,12 @@ function ConnectionWizard() {
   useEffect(() => {
     if (params.connectionId && params.connectionId !== "new" && !paramsInitRef.current) {
       paramsInitRef.current = true;
-      dispatch(getConnection({ team_id: params.teamId, connection_id: params.connectionId }));
+      dispatch(getConnection({ team_id: params.teamId, connection_id: params.connectionId }))
+        .then((res) => {
+          if (res?.payload) {
+            setConnectionToEdit(res.payload);
+          }
+        });
     }
   }, [params]);
 
@@ -183,12 +188,12 @@ function ConnectionWizard() {
                 <Spacer y={4} />
                 <div className="grid grid-cols-12 gap-4">
                   {_filteredConnections.map((conn) => (
-                    <div key={conn.name} className="col-span-12 sm:col-span-6 md:col-span-4 lg:col-span-2">
+                    <div key={conn.name} className="col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-3 xl:col-span-2">
                       <Card
                         shadow="none"
                         isPressable
-                        className={`w-full ${selectedType === conn.type ? "border-3 border-primary" : "border-3 border-content3"}`}
-                        onClick={() => setSelectedType(conn.type)}
+                        className={`w-full h-full ${selectedType === conn.type ? "border-3 border-primary" : "border-3 border-content3"}`}
+                        onPress={() => setSelectedType(conn.type)}
                       >
                         <CardBody className="overflow-visible p-0">
                           <Image
@@ -199,7 +204,14 @@ function ConnectionWizard() {
                             src={connectionImages(isDark)[conn.type]}
                           />
                         </CardBody>
-                        <CardFooter className="justify-center">
+                        <CardFooter className="justify-center flex flex-col gap-1">
+                          {conn.ai && (
+                            <Tooltip content="You can use AI to ask questions about your data">
+                              <Chip radius="sm" color="secondary" variant="flat" size="sm" startContent={<LuBrainCircuit />}>
+                                {"AI-powered"}
+                              </Chip>
+                            </Tooltip>
+                          )}
                           <span className="text-sm font-semibold">{conn.name}</span>
                         </CardFooter>
                       </Card>
@@ -225,8 +237,8 @@ function ConnectionWizard() {
 
           {newConnection && (
             <div className="flex flex-row items-center gap-2">
-              <Link to="/user" className="text-xl text-secondary font-semibold">
-                <LuArrowLeftCircle size={24} />
+              <Link to="/connections" className="text-xl text-secondary font-semibold">
+                <LuCircleArrowLeft size={24} />
               </Link>
               <span className="text-xl font-semibold">Edit your connection</span>
             </div>
@@ -255,6 +267,7 @@ function ConnectionWizard() {
             <MysqlConnectionForm
               onComplete={_onAddNewConnection}
               editConnection={newConnection}
+              subType="mysql"
             />
           )}
           {selectedType === "firestore" && (
@@ -292,6 +305,27 @@ function ConnectionWizard() {
               onComplete={_onAddNewConnection}
               editConnection={newConnection}
               subType="timescaledb"
+            />
+          )}
+          {selectedType === "supabasedb" && (
+            <PostgresConnectionForm
+              onComplete={_onAddNewConnection}
+              editConnection={newConnection}
+              subType="supabasedb"
+            />
+          )}
+          {selectedType === "rdsPostgres" && (
+            <PostgresConnectionForm
+              onComplete={_onAddNewConnection}
+              editConnection={newConnection}
+              subType="rdsPostgres"
+            />
+          )}
+          {selectedType === "rdsMysql" && (
+            <MysqlConnectionForm
+              onComplete={_onAddNewConnection}
+              editConnection={newConnection}
+              subType="rdsMysql"
             />
           )}
 
@@ -375,6 +409,7 @@ function ConnectionWizard() {
 
       <Modal
         isOpen={completionModal}
+        backdrop="blur"
         onClose={() => setCompletionModal(false)}
         size="lg"
       >
@@ -384,42 +419,35 @@ function ConnectionWizard() {
             <span className="font-semibold">Your connection was saved!</span>
           </ModalHeader>
           <ModalBody>
-            What would you like to do next?
+            {connections.length > 1 && (
+              <div>What would you like to do next?</div>
+            )}
+            {connections.length < 2 && (
+              <div>Create your first dataset to start visualizing your data</div>
+            )}
           </ModalBody>
           <ModalFooter>
-            <Button
-              color="secondary"
-              fullWidth
-              onClick={() => navigate("/user")}
-              startContent={<LuLayoutDashboard />}
-            >
-              Return to dashboard
-            </Button>
+            {connections.length > 1 && (
+              <Button
+                variant="bordered"
+                fullWidth
+                onClick={() => navigate("/")}
+                startContent={<LuLayoutDashboard />}
+              >
+                Return to dashboard
+              </Button>
+            )}
             <Button
               color="primary"
               fullWidth
               onClick={() => navigate(`/${params.teamId}/dataset/new`)}
-              startContent={<LuAreaChart />}
+              startContent={<LuChartArea />}
             >
               Create dataset
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
-
-      <ToastContainer
-        position="top-center"
-        autoClose={1500}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnVisibilityChange
-        draggable
-        pauseOnHover
-        transition={Flip}
-        theme={isDark ? "dark" : "light"}
-      />
     </div>
   )
 }

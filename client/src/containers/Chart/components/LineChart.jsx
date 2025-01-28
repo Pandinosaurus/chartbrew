@@ -4,18 +4,18 @@ import { Line } from "react-chartjs-2";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title,
-  Tooltip, Legend, Filler,
+  Tooltip, Legend, Filler, LogarithmicScale,
 } from "chart.js";
-import { semanticColors } from "@nextui-org/react";
+import { semanticColors } from "@heroui/react";
 import { cloneDeep } from "lodash";
 
 import KpiChartSegment from "./KpiChartSegment";
 import ChartErrorBoundary from "./ChartErrorBoundary";
-import useThemeDetector from "../../../modules/useThemeDetector";
+import { useTheme } from "../../../modules/ThemeContext";
 import { getHeightBreakpoint, getWidthBreakpoint } from "../../../modules/layoutBreakpoints";
 
 ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler
+  CategoryScale, LinearScale, LogarithmicScale, PointElement, LineElement, Title, Tooltip, Legend, Filler
 );
 
 const dataLabelsPlugin = {
@@ -43,7 +43,8 @@ function LineChart(props) {
     chart, redraw, redrawComplete, editMode,
   } = props;
 
-  const theme = useThemeDetector() ? "dark" : "light";
+  const { isDark } = useTheme();
+  const theme = isDark ? "dark" : "light";
   const chartRef = useRef(null);
 
   useEffect(() => {
